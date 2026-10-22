@@ -3,6 +3,8 @@ import { KhanArt } from './LocArt';
 import { PALACES } from '../data/story';
 import { useStory, storyService } from '../services/storyService';
 import { luckService } from '../services/luckService';
+import { useCalendar, lunarLabel } from './Calendar';
+import { yearName } from '../services/lunar';
 
 /** Hanging red lantern, drawn in SVG */
 const Lantern: React.FC<{ x: string; delay: number; s?: number }> = ({ x, delay, s = 1 }) => (
@@ -52,6 +54,7 @@ export const Landing: React.FC<{ onEnter: () => void; onWatch: () => void }> = (
         <div className="text-[#e9b84a] text-xs sm:text-sm uppercase tracking-[0.35em] pl-[0.35em] font-semibold">Phủ thờ Mẫu · A Mother Goddess temple</div>
         <h1 className="font-display font-bold text-5xl sm:text-7xl mt-2 text-[#fff4dc] drop-shadow-[0_2px_20px_rgba(233,184,74,0.35)]">Phủ Vân Thủy</h1>
         <p className="mt-3 font-display italic text-lg sm:text-xl text-[#f2d9a8]">The Cloud & Water Temple</p>
+        <TodayLine />
 
         <div className="mt-8 flex gap-3 sm:gap-4" aria-label="The four scarves">
           {PALACES.map((p) => (
@@ -81,6 +84,11 @@ export const Landing: React.FC<{ onEnter: () => void; onWatch: () => void }> = (
               onClick={() => {
                 if (confirm('Start the story again? Your scarves, pouch, phúc and journal will be cleared.')) {
                   storyService.reset();
+                  try {
+                    localStorage.removeItem('pvt_pos');
+                  } catch {
+                    /* ignore */
+                  }
                   luckService.reset();
                 }
               }}
@@ -111,6 +119,29 @@ export const Landing: React.FC<{ onEnter: () => void; onWatch: () => void }> = (
           recognised as Intangible Cultural Heritage in 2016. The legends are retold from tradition; the fortune verses are written for this temple.
         </p>
       </main>
+    </div>
+  );
+};
+
+/** today on the lunar calendar, and what's next at the temple */
+const TodayLine: React.FC = () => {
+  const { lunar, festival, next } = useCalendar();
+  return (
+    <div className="mt-4 flex flex-col items-center gap-1 text-[13px]">
+      <span className="text-[#e8cfa0]">
+        Hôm nay · {lunarLabel(lunar)} năm {yearName(lunar.year)}
+      </span>
+      {festival ? (
+        <span className="px-3 py-1 rounded-md dh-seal text-[13px] font-semibold">
+          Today: {festival.vi} · {festival.en}
+        </span>
+      ) : (
+        next && (
+          <span className="text-[#c9b48a] italic">
+            Next: {next.f.vi} ({next.f.en}) in {next.days} day{next.days === 1 ? '' : 's'}
+          </span>
+        )
+      )}
     </div>
   );
 };

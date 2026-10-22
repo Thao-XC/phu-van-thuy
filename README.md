@@ -41,6 +41,16 @@ and watch it drift away. Lovelier at night.
 
 **Living temple.** You arrive by boat up the misty river (Space skips). A firefly drifts beside you: press G (or "Guide me") and it flies ahead to your next step or the current secret. Other visitors walk the grounds and pray; the soundscape follows the time of day.
 
+**A living temple on the real calendar.** Day, dusk and night follow the visitor's own clock ("Live" in the Time tab;
+choosing a time by hand turns it off). The temple keeps the Vietnamese lunar calendar (computed for UTC+7): the date
+chip shows today's âm lịch date, and on festival days the grounds change, with Tết peach blossoms and lanterns,
+Rằm tháng Giêng lanterns, Giỗ Mẫu five-colour flags, Vu Lan lights on the river, Trung Thu star lanterns, carp for
+Ông Công Ông Táo, and busier courtyards on every new and full moon. Each festival has one activity (once per year, for
+phúc). Preview any day with `?date=YYYY-MM-DD`, e.g. `?date=2026-02-17` for Tết.
+
+**Saving.** Everything saves automatically in the browser, including where you stood. Returning visitors reappear
+where they left off; first-time visitors arrive by boat.
+
 **Navigation.** Esc, the browser back button and Android's back gesture always step back one level.
 
 ## Run

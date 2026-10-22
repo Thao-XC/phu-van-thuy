@@ -10,6 +10,8 @@ import { phuVanThuy } from './world/phuVanThuy';
 import type { GroundFn, LayoutCtx, LayoutResult, ParticleKind, SecretDef, Etiquette, SpotDef } from './world/types';
 import type { EncounterDef, EncounterEvent, EncounterRuntime, StoryCard, EncounterApi } from './encounters/types';
 import { Firefly, Visitors, Arrival } from './living';
+import { buildFestivalDecor, heldStar, type FestivalDecor } from './festivalDecor';
+import type { Decor } from '../services/lunar';
 
 export type TimeOfDay = 'day' | 'twilight' | 'night';
 
@@ -1293,6 +1295,42 @@ export class TempleScene {
     if (fadeBack) this.fadeTo(0x000000, 0, 0.6);
     this.callbacks.onArrivalEnd?.();
   }
+  /* ---------------- the lunar calendar's days ---------------- */
+  private festival: FestivalDecor | null = null;
+  private star: THREE.Group | null = null;
+  /** put up (or take down) the decorations for today's festival */
+  public setFestival(kind: Decor | null, crowd = false) {
+    if (this.festival) {
+      this.scene.remove(this.festival.group);
+      this.festival = null;
+    }
+    if (kind && kind !== 'quiet' && this.kitForEncounters) {
+      this.festival = buildFestivalDecor(kind, this.kitForEncounters.vk, this.ground);
+      this.scene.add(this.festival.group);
+    }
+    this.visitors?.setCrowd(crowd);
+  }
+  public releaseCarp() {
+    this.festival?.releaseCarp?.();
+    soundService.playSplash();
+  }
+  /** carry a Mid-Autumn star lantern */
+  public carryStar(on: boolean) {
+    if (on && !this.star) {
+      this.star = heldStar();
+      this.camera.add(this.star);
+    } else if (!on && this.star) {
+      this.camera.remove(this.star);
+      this.star = null;
+    }
+  }
+  /** put the visitor back where they left off */
+  public placePlayer(x: number, z: number, yaw: number) {
+    if (this.walkable && !this.walkable(x, z)) return;
+    this.playerPosition.set(x, 1.7 + this.ground(x, z), z);
+    this.playerRotationY = yaw;
+  }
+
   /** the firefly flies ahead to (x, z) */
   public guideTo(x: number, z: number) {
     this.firefly?.guide(x, z);
@@ -1302,6 +1340,7 @@ export class TempleScene {
     const outside = !this.enc;
     this.firefly?.update(dt, t, this.playerPosition, this.playerRotationY, outside && !this.arriving && !this.isCinematicMode);
     this.visitors?.update(dt, t, this.playerPosition, outside);
+    this.festival?.update(t, dt);
     if (this.arrival?.done) this.arrival.leave(dt);
   }
 

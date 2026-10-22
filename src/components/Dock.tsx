@@ -22,6 +22,9 @@ interface Props {
   onTime: (t: TimeOfDay) => void;
   auto: boolean;
   onAuto: () => void;
+  /** follow the player's real clock */
+  live: boolean;
+  onLive: () => void;
   tour: boolean;
   onTour: () => void;
   onTeleport: (id: string) => void;
@@ -34,7 +37,7 @@ interface Props {
  * Bottom control dock: rituals, "go to" places and time of day. Collapses to a slim bar (H).
  * Centred with an inline transform so it never drifts off-screen.
  */
-export const Dock: React.FC<Props> = ({ spots, time, onTime, auto, onAuto, tour, onTour, onTeleport, onRitual, onBow, children }) => {
+export const Dock: React.FC<Props> = ({ spots, time, onTime, auto, onAuto, live, onLive, tour, onTour, onTeleport, onRitual, onBow, children }) => {
   const [open, setOpen] = useState(true);
   const [tab, setTab] = useState<'rituals' | 'goto' | 'time'>('rituals');
   useEffect(() => {
@@ -97,6 +100,9 @@ export const Dock: React.FC<Props> = ({ spots, time, onTime, auto, onAuto, tour,
               ))}
             {tab === 'time' && (
               <>
+                <button onClick={onLive} aria-pressed={live} title="Day and night follow your real clock" className={`shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl border text-[13px] font-semibold cursor-pointer ${live ? 'bg-[#b8382b] text-[#f3ead6] border-[#211a15]' : 'bg-[#fffaf0] border-[#e6d6b8] text-[#2a1d14]'}`}>
+                  ● Live · real time
+                </button>
                 {(
                   [
                     ['day', 'Day', Sun],
@@ -104,7 +110,7 @@ export const Dock: React.FC<Props> = ({ spots, time, onTime, auto, onAuto, tour,
                     ['night', 'Night', Moon],
                   ] as const
                 ).map(([k, l, I]) => (
-                  <button key={k} onClick={() => onTime(k)} aria-pressed={time === k} className={`shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl border text-[13px] font-semibold cursor-pointer ${time === k ? 'bg-[#2a1410] text-[#fbeed2] border-[#2a1410]' : 'bg-[#fffaf0] border-[#e6d6b8] text-[#2a1d14]'}`}>
+                  <button key={k} onClick={() => onTime(k)} aria-pressed={!live && time === k} className={`shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl border text-[13px] font-semibold cursor-pointer ${!live && time === k ? 'bg-[#2a1410] text-[#fbeed2] border-[#2a1410]' : 'bg-[#fffaf0] border-[#e6d6b8] text-[#2a1d14]'}`}>
                     <I className="w-4 h-4" /> {l}
                   </button>
                 ))}

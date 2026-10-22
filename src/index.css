@@ -152,3 +152,6 @@
 @keyframes barIn2 { from { transform: translateY(100%) } to { transform: none } }
 .arrive-title { animation: arriveTitle 13s ease-in-out both; }
 @keyframes arriveTitle { 0%, 12% { opacity: 0; transform: translateY(10px) } 22%, 70% { opacity: 1; transform: none } 85%, 100% { opacity: 0 } }
+
+.fest-in { animation: festIn .8s cubic-bezier(.2,1.4,.4,1) both; }
+@keyframes festIn { from { opacity: 0; transform: translateY(-12px) scale(.95) } to { opacity: 1; transform: none } }

@@ -10,6 +10,8 @@ import { KeeperSheet } from './components/Keeper';
 import { JournalSheet } from './components/Journal';
 import { Tracker } from './components/Trail';
 import { LegendFilm } from './components/LegendFilm';
+import { useCalendar, CalendarChip, FestivalSheet, festivalKey, isFestivalDone, markFestivalDone } from './components/Calendar';
+import { liveTimeOfDay, today, type Festival } from './services/lunar';
 import { SECRETS, nextSecret } from './data/story';
 import { IncenseModal, AltarModal, XamModal, PetitionModal, StallModal } from './components/Rituals';
 import { KhanArt } from './components/LocArt';
@@ -22,7 +24,7 @@ import { useBackLayer } from './services/backStack';
 import { PALACES, type PalaceId } from './data/story';
 import type { LocKind } from './data/rituals';
 
-type Modal = 'keeper' | 'incense' | 'altar' | 'fortune' | 'furnace' | 'stall' | 'journal' | 'settings' | 'controls' | 'lantern' | 'film' | null;
+type Modal = 'keeper' | 'incense' | 'altar' | 'fortune' | 'furnace' | 'stall' | 'journal' | 'settings' | 'controls' | 'lantern' | 'film' | 'calendar' | null;
 
 const PROMPT: Record<string, string> = {
   gate: 'Vái before the gate',
@@ -50,7 +52,16 @@ export default function App() {
   const [card, setCard] = useState<{ card: StoryCard; luck: number; firstTime: boolean } | null>(null);
   const [showPhuc, setShowPhuc] = useState(false);
   const [inRealm, setInRealm] = useState(false);
-  const [time, setTime] = useState<TimeOfDay>('twilight');
+  const [time, setTime] = useState<TimeOfDay>(() => liveTimeOfDay(today()));
+  const [live, setLive] = useState(() => {
+    try {
+      return localStorage.getItem('pvt_live') !== '0';
+    } catch {
+      return true;
+    }
+  });
+  const cal = useCalendar();
+  const [festBanner, setFestBanner] = useState(false);
   const [auto, setAuto] = useState(false);
   const [tour, setTour] = useState(false);
   const [muted, setMuted] = useState(soundService.getMuted());
@@ -132,7 +143,18 @@ export default function App() {
         }
       },
     });
-    if (!arrivedThisVisit) {
+    // returning visitors reappear where they left off; first-timers arrive by boat
+    let saved: { x: number; z: number; yaw: number } | null = null;
+    try {
+      saved = JSON.parse(localStorage.getItem('pvt_pos') || 'null');
+    } catch {
+      /* ignore */
+    }
+    if (saved) {
+      arrivedThisVisit = true;
+      s.placePlayer(saved.x, saved.z, saved.yaw);
+      window.setTimeout(() => showCaption('Welcome back. The Mothers kept your place.', 4), 1500);
+    } else if (!arrivedThisVisit) {
       s.playArrival();
       setArriving(true);
     }
@@ -156,6 +178,54 @@ export default function App() {
       scene.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
+
+  // the temple follows the real clock
+  useEffect(() => {
+    try {
+      localStorage.setItem('pvt_live', live ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+    if (!live || view !== 'temple') return;
+    const t = liveTimeOfDay(cal.now);
+    if (t !== time) {
+      setTime(t);
+      soundService.setMood(t);
+      scene.current?.setTimeOfDay(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live, view, cal.now]);
+
+  // decorations and crowds for today's festival
+  useEffect(() => {
+    if (view !== 'temple') return;
+    scene.current?.setFestival(cal.festival?.decor ?? null, !!cal.festival?.major);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, cal.festival?.id]);
+
+  // tell the visitor about today's festival once they're inside
+  useEffect(() => {
+    if (view !== 'temple' || arriving || tips || loading || !cal.festival) return;
+    setFestBanner(true);
+    const t = window.setTimeout(() => setFestBanner(false), 12000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, arriving, tips, loading, cal.festival?.id]);
+
+  // remember where the visitor stands
+  useEffect(() => {
+    if (view !== 'temple') return;
+    const t = window.setInterval(() => {
+      const s = scene.current;
+      if (!s || s.inRealm || s.arriving) return;
+      try {
+        localStorage.setItem('pvt_pos', JSON.stringify({ x: +s.playerPosition.x.toFixed(2), z: +s.playerPosition.z.toFixed(2), yaw: +s.playerRotationY.toFixed(3) }));
+      } catch {
+        /* ignore */
+      }
+    }, 3000);
+    return () => clearInterval(t);
   }, [view]);
 
   // apply settings to the scene
@@ -283,7 +353,28 @@ export default function App() {
     showCaption('The firefly darts ahead. Follow its light.', 3);
   };
 
-  const changeTime = (t: TimeOfDay) => {
+  // today's festival activity: once per festival for phúc, then the ritual itself
+  const doFestival = (f: Festival) => {
+    setModal(null);
+    const k = festivalKey(f, cal.lunar);
+    if (!isFestivalDone(k)) {
+      markFestivalDone(k);
+      luckService.change(3, `Kept ${f.vi}`);
+    }
+    const r = f.activity.ritual;
+    if (r === 'carp') {
+      scene.current?.travelToSpot('river', () => window.setTimeout(() => scene.current?.releaseCarp(), 600));
+      showCaption(f.activity.done, 5);
+    } else if (r === 'star') {
+      scene.current?.carryStar(true);
+      showCaption(f.activity.done, 5);
+    } else {
+      window.setTimeout(() => setModal(r), 250);
+    }
+  };
+
+  const changeTime = (t: TimeOfDay, manual = true) => {
+    if (manual) setLive(false);
     soundService.setMood(t);
     setTime(t);
     scene.current?.setTimeOfDay(t);
@@ -324,6 +415,7 @@ export default function App() {
         <div className="hidden min-[520px]:flex items-center gap-2 px-3 py-2 rounded-xl dh-paper border border-[#211a15] shadow-md text-xs">
           <span className="text-[#4a3826] font-semibold">Phủ Vân Thủy</span>
         </div>
+        <CalendarChip lunar={cal.lunar} festival={cal.festival} onClick={() => setModal('calendar')} />
       </div>
 
       {/* top-right: phúc, scarves, journal, sound */}
@@ -362,6 +454,15 @@ export default function App() {
         <div className={`fixed left-3 top-[calc(max(0.75rem,env(safe-area-inset-top))+3rem)] z-20 ${modal ? 'hidden sm:block' : ''}`}>
           <Tracker getDistance={getSecretDistance} isNight={time === 'night'} onOpenTrail={() => openJournal('trail')} onGuide={guide} />
         </div>
+      )}
+
+      {/* today's festival */}
+      {festBanner && cal.festival && !modal && !inRealm && (
+        <button onClick={() => setModal('calendar')} className="fixed top-16 left-1/2 -translate-x-1/2 z-30 px-5 py-3 rounded-md dh-seal text-center cursor-pointer fest-in max-w-[92vw]">
+          <div className="text-[11px] uppercase tracking-[0.2em] opacity-90">Hôm nay · today</div>
+          <div className="dh-title text-lg leading-tight">{cal.festival.vi}</div>
+          <div className="text-[12px] italic opacity-90">{cal.festival.en} · see what's happening</div>
+        </button>
       )}
 
       {/* arrival by boat: letterbox, a printed title, skip */}
@@ -454,8 +555,15 @@ export default function App() {
           time={time}
           onTime={changeTime}
           auto={auto}
+          live={live}
+          onLive={() => {
+            setAuto(false);
+            if (scene.current) scene.current.isAutoCycleTime = false;
+            setLive(true);
+          }}
           onAuto={() => {
             const a = !auto;
+            setLive(false);
             setAuto(a);
             if (scene.current) scene.current.isAutoCycleTime = a;
           }}
@@ -560,6 +668,7 @@ export default function App() {
         />
       )}
       {modal === 'film' && <LegendFilm onClose={() => setModal(null)} />}
+      {modal === 'calendar' && <FestivalSheet onClose={() => setModal(null)} now={cal.now} lunar={cal.lunar} festival={cal.festival} onActivity={doFestival} />}
       {modal === 'journal' && <JournalSheet onWatchFilm={() => setModal('film')} initial={journalTab} onClose={() => setModal(null)} onOpenCard={(c) => setCard({ card: c, luck: 0, firstTime: false })} />}
 
       <LuckToasts />

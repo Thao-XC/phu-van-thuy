@@ -45,7 +45,7 @@ export class Firefly {
   constructor(private ground: Ground) {
     const core = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), new THREE.MeshBasicMaterial({ color: 0xfff3c0 }));
     this.sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-    this.sprite.scale.setScalar(0.7);
+    this.sprite.scale.setScalar(0.4);
     this.obj.add(core, this.sprite, this.light);
     const n = 24;
     this.trailPos = new Float32Array(n * 3);
@@ -92,7 +92,7 @@ export class Firefly {
       if (toPlayer < 3.2 || this.guideT > 40) this.target = null;
     } else {
       // drift beside the visitor, a little ahead and to the left
-      this.home.set(player.x + Math.sin(yaw + 0.9) * -1.3, player.y + 0.05 + Math.sin(t * 2.1) * 0.18, player.z + Math.cos(yaw + 0.9) * -1.3);
+      this.home.set(player.x + Math.sin(yaw + 1.25) * -1.8, player.y - 0.25 + Math.sin(t * 2.1) * 0.15, player.z + Math.cos(yaw + 1.25) * -1.8);
       goal = this.home;
       speed = 2.6;
     }
@@ -103,7 +103,7 @@ export class Firefly {
     this.obj.position.y += Math.cos(t * 4.1) * 0.004;
     const pulse = 0.75 + Math.sin(t * 3.2) * 0.25;
     this.light.intensity = 1.1 * pulse + (this.target ? 0.8 : 0);
-    this.sprite.scale.setScalar(0.55 + pulse * 0.25);
+    this.sprite.scale.setScalar(0.3 + pulse * 0.14);
     // trail
     this.trailPos.copyWithin(3, 0, this.trailPos.length - 3);
     this.trailPos.set([this.obj.position.x, this.obj.position.y, this.obj.position.z], 0);
@@ -157,8 +157,14 @@ const ROUTES: { robe: number; under: number; h: number; route: Stop[] }[] = [
 
 export class Visitors {
   private list: Visitor[] = [];
+  /** on festival days the temple is crowded: more visitors on the same routes */
+  setCrowd(on: boolean) {
+    this.list.forEach((v, i) => {
+      if (i >= ROUTES.length) v.fig.userData.hidden = !on;
+    });
+  }
   constructor(scene: THREE.Scene, private ground: Ground) {
-    ROUTES.forEach((r, k) => {
+    [...ROUTES, ...ROUTES.map((r, i) => ({ ...r, robe: [0xb8382b, 0x8a5a3b, 0x2f5a7a, 0xe2b33b][i], route: [...r.route].reverse() }))].forEach((r, k) => {
       const fig = robedFigure({ robe: r.robe, under: r.under, h: r.h, hat: 'none' });
       // khăn vấn turban
       const khan = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.05, 6, 14), new THREE.MeshStandardMaterial({ color: r.under === 0xf1ead8 ? 0x2a2a2a : r.under, roughness: 0.8 }));
@@ -169,13 +175,14 @@ export class Visitors {
       const s = r.route[k % r.route.length];
       fig.position.set(s.x, ground(s.x, s.z), s.z);
       scene.add(fig);
-      this.list.push({ fig, route: r.route, i: k % r.route.length, wait: 1 + k, phase: k * 1.3 });
+      if (k >= ROUTES.length) fig.userData.hidden = true;
+      this.list.push({ fig, route: r.route, i: (k * 3) % r.route.length, wait: 1 + k, phase: k * 1.3 });
     });
   }
   update(dt: number, t: number, player: THREE.Vector3, visible: boolean) {
     for (const v of this.list) {
-      v.fig.visible = visible;
-      if (!visible) continue;
+      v.fig.visible = visible && !v.fig.userData.hidden;
+      if (!v.fig.visible) continue;
       const stop = v.route[v.i];
       if (v.wait > 0) {
         v.wait -= dt;
