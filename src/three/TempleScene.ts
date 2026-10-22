@@ -11,6 +11,7 @@ import type { GroundFn, LayoutCtx, LayoutResult, ParticleKind, SecretDef, Etique
 import type { EncounterDef, EncounterEvent, EncounterRuntime, StoryCard, EncounterApi } from './encounters/types';
 import { Firefly, Visitors, Arrival, Ceremony, type GiaLook } from './living';
 import { HallAtmosphere } from './atmosphere';
+import { Hands, Rite, BowRite, IncenseRite, XamRite, type RiteHost } from './fpv';
 import { WORLD } from './world/phuVanThuy';
 import { buildFestivalDecor, heldStar, type FestivalDecor } from './festivalDecor';
 import type { Decor } from '../services/lunar';
@@ -35,6 +36,9 @@ export interface SceneCallbacks {
   onGaze?: (level: number) => void;
   /** the trance peaked: a vision */
   onVision?: () => void;
+  /** a first-person rite: what to do next (null when it ends) */
+  onRiteHint?: (text: string | null) => void;
+  onRiteDone?: (r: { kind: string; n?: number }) => void;
   /** a floating place marker was clicked */
   onSpotClick?: (spotId: string) => void;
   /** PC: the place marker under the crosshair changed */
@@ -361,6 +365,7 @@ export class TempleScene {
     }
     this.spots = res.spots;
     this.buildMarkers();
+    if (!this.hands) this.hands = new Hands(this.camera);
     this.firefly = new Firefly(this.ground);
     this.firefly.onArrive = () => this.callbacks.onGuideArrive?.();
     this.firefly.attach(this.scene, this.playerPosition.clone().add(new THREE.Vector3(-1, 0, -1)));
@@ -584,6 +589,14 @@ export class TempleScene {
   }
 
   private onKeyDown = (e: KeyboardEvent) => {
+    if (this.rite && !this.rite.finished) {
+      if (e.repeat) return;
+      if (e.code === 'Space' || (e.code === 'Enter' && !(this.rite instanceof IncenseRite))) {
+        e.preventDefault();
+        this.rite.press(true);
+      } else this.rite.key(e.key);
+      return;
+    }
     if (this.arriving && (e.code === 'Space' || e.code === 'Enter')) {
       e.preventDefault();
       this.skipArrival();
@@ -598,6 +611,7 @@ export class TempleScene {
 
   private onKeyUp = (e: KeyboardEvent) => {
     this.keysPressed[e.code] = false;
+    if (this.rite && (e.code === 'Space' || e.code === 'Enter')) this.rite.press(false);
   };
 
   /* ---------------- PC controls ---------------- */
@@ -615,6 +629,7 @@ export class TempleScene {
   }
 
   private turn(dx: number, dy: number, scale: number) {
+    if (this.rite) return;
     const k = scale * this.look.sensitivity;
     this.playerRotationY -= dx * k;
     this.playerPitch -= dy * k * (this.look.invertY ? -1 : 1);
@@ -654,6 +669,12 @@ export class TempleScene {
   }
 
   private onPointerDown = (e: PointerEvent) => {
+    if (this.rite && !this.rite.finished) {
+      this.rite.press(true);
+      this.isDragging = true;
+      this.previousPointerPos = { x: e.clientX, y: e.clientY };
+      return;
+    }
     this._downAt = { x: e.clientX, y: e.clientY, t: performance.now() };
     // clicking a floating place marker goes there instead of capturing the mouse
     if (!this.pointerLocked && e.button === 0) {
@@ -677,6 +698,7 @@ export class TempleScene {
   };
 
   private onPointerMove = (e: PointerEvent) => {
+    if (this.rite && this.isDragging) this.rite.drag(e.movementX || e.clientX - this.previousPointerPos.x);
     if (this.pointerLocked) {
       this.turn(e.movementX, e.movementY, 0.0022);
       return;
@@ -756,6 +778,10 @@ export class TempleScene {
 
   private onPointerUp = (e: PointerEvent) => {
     this.isDragging = false;
+    if (this.rite) {
+      this.rite.press(false);
+      return;
+    }
     // mouse captured: a click picks whatever marker is under the crosshair
     if (this.pointerLocked && e.button === 0 && performance.now() - this._downAt.t < 350) {
       const id = this.pickMarker();
@@ -828,8 +854,8 @@ export class TempleScene {
       // seated at the side of the mat, eyes on the medium
       const w = this.watching;
       w.t = Math.min(1, w.t + delta * 0.6);
-      const gy = this.ground(-2.2, -7.4);
-      const seat = new THREE.Vector3(-2.2 + Math.sin(this.elapsed * 0.3) * 0.08, gy + 1.15, -7.4);
+      const gy = this.ground(0.9, -7.4);
+      const seat = new THREE.Vector3(0.9 + Math.sin(this.elapsed * 0.3) * 0.06, gy + 1.15, -7.4);
       this.camera.position.lerpVectors(w.from, seat, w.t * w.t * (3 - 2 * w.t));
       this.camera.lookAt(0, gy + 1.2, -11);
       return;
@@ -858,7 +884,7 @@ export class TempleScene {
 
     // Direction vectors
     const running = !!(this.keysPressed['ShiftLeft'] || this.keysPressed['ShiftRight']);
-    const frozen = !!this.fade || (this.enc !== null && (this.enc.ending || !this.enc.rt));
+    const frozen = !!this.fade || !!this.rite || (this.enc !== null && (this.enc.ending || !this.enc.rt));
     const swim = this.enc?.rt?.underwater ? 0.65 : 1;
     const moveSpeed = frozen ? 0 : (running ? 9.0 : 4.5) * swim * delta;
 
@@ -968,8 +994,12 @@ export class TempleScene {
     let pitch = this.playerPitch;
     if (this.bowAnim > 0) {
       this.bowAnim = Math.max(0, this.bowAnim - delta);
-      pitch -= Math.sin(((1.6 - this.bowAnim) / 1.6) * Math.PI) * 0.75;
+      pitch -= Math.sin(((this.bowDur - this.bowAnim) / this.bowDur) * Math.PI) * 0.75;
+      this.camera.position.y -= Math.sin(((this.bowDur - this.bowAnim) / this.bowDur) * Math.PI) * 0.12;
     }
+    // kneeling lowers the eye
+    this.kneelCur += (this.kneelTarget - this.kneelCur) * Math.min(1, delta * 4);
+    this.camera.position.y -= this.kneelCur;
 
     // Look target
     this._forward.set(0, 0, -1).applyAxisAngle(new THREE.Vector3(1, 0, 0), pitch);
@@ -1284,8 +1314,8 @@ export class TempleScene {
   /* ================================================================== */
   /** Bow (B key / Bow button). Greets the kami at the gate, and some secrets answer a bow. */
   public bow() {
-    if (this.bowAnim > 0 || this.enc) return;
-    this.bowAnim = 1.6;
+    if (this.bowAnim > 0 || this.enc || this.rite) return;
+    this.startRite('bow');
     this.manners.lastBow = this.elapsed;
     const px = this.playerPosition.x, pz = this.playerPosition.z;
     const s = this.secrets.find((d) => d.trigger === 'bow' && Math.hypot(px - d.at[0], pz - d.at[1]) < (d.r ?? 3));
@@ -1298,6 +1328,104 @@ export class TempleScene {
       this.manners.bowedAtGate = true;
       this.callbacks.onLuck?.(1, 'Vái at the tam quan before entering', 'bow-gate');
     }
+  }
+
+  /* ---------------- first-person hands and rites ---------------- */
+  private hands: Hands | null = null;
+  private rite: Rite | null = null;
+  private bowDur = 1.6;
+  private kneelCur = 0;
+  private kneelTarget = 0;
+  private faceTarget: THREE.Vector3 | null = null;
+  private planted: { g: THREE.Group; t: number }[] = [];
+  private riteHost(): RiteHost {
+    return {
+      hands: this.hands!,
+      bow: (sec = 1.6) => {
+        this.bowDur = sec;
+        this.bowAnim = sec;
+      },
+      face: (x, y, z) => (this.faceTarget = new THREE.Vector3(x, y, z)),
+      kneel: (a) => (this.kneelTarget = a),
+      plantIncense: (n) => this.plantIncense(n),
+      sound: {
+        mo: () => soundService.playMo(),
+        chime: () => soundService.playBellChime(),
+        rattle: () => soundService.playOmikujiShake(),
+        burn: () => soundService.playPaperBurn(),
+        clack: () => soundService.playCoinToss(),
+      },
+    };
+  }
+  /** begin a rite done with your own hands */
+  public startRite(kind: 'bow' | 'pray' | 'incense' | 'xam', draw?: () => { n: number; verse: [string, string]; color: string }) {
+    if (!this.hands || this.enc) return;
+    this.rite?.cancel();
+    this.releasePointer();
+    const ev = {
+      hint: (t: string | null) => this.callbacks.onRiteHint?.(t),
+      done: (r: { kind: string; n?: number }) => this.callbacks.onRiteDone?.(r),
+    };
+    const host = this.riteHost();
+    if (kind === 'bow') this.rite = new BowRite(host, ev, 1);
+    else if (kind === 'pray') this.rite = new BowRite(host, ev, 3, 'Hands together before the Mothers. Three slow bows…');
+    else if (kind === 'incense') this.rite = new IncenseRite(host, ev, new THREE.Vector3(0, this.ground(0, 14) + 1.2, 14));
+    else if (kind === 'xam' && draw) this.rite = new XamRite(host, ev, new THREE.Vector3(8.8, this.ground(8.8, -9) + 0.9, -9), draw);
+  }
+  public cancelRite() {
+    this.rite?.cancel();
+    this.rite = null;
+    this.faceTarget = null;
+  }
+  public get inRite() {
+    return !!this.rite;
+  }
+  private plantIncense(n: number) {
+    const g = new THREE.Group();
+    const base = new THREE.Vector3(0, this.ground(0, 14) + 1.05, 14);
+    const stem = new THREE.MeshStandardMaterial({ color: 0xa8402e });
+    const tip = new THREE.MeshBasicMaterial({ color: 0xff7a2a });
+    for (let i = 0; i < n; i++) {
+      const s = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.45, 5), stem);
+      const x = (i - (n - 1) / 2) * 0.05 + (Math.random() - 0.5) * 0.06;
+      s.position.set(base.x + x, base.y + 0.22, base.z + (Math.random() - 0.5) * 0.08);
+      s.rotation.z = (Math.random() - 0.5) * 0.12;
+      g.add(s);
+      const tp = new THREE.Mesh(new THREE.SphereGeometry(0.008, 6, 4), tip);
+      tp.position.set(s.position.x, base.y + 0.45, s.position.z);
+      g.add(tp);
+    }
+    this.scene.add(g);
+    this.planted.push({ g, t: 0 });
+  }
+  private updateRite(dt: number) {
+    this.hands?.update(dt);
+    if (this.faceTarget && this.rite) {
+      const d = this.faceTarget.clone().sub(this.camera.position);
+      const yaw = Math.atan2(-d.x, -d.z);
+      const pitch = Math.atan2(d.y, Math.hypot(d.x, d.z));
+      let dy = yaw - this.playerRotationY;
+      dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      const k = Math.min(1, dt * 3);
+      this.playerRotationY += dy * k;
+      this.playerPitch += (pitch - this.playerPitch) * k;
+    }
+    if (this.rite) {
+      this.rite.update(dt, this.elapsed);
+      if (this.rite.finished) {
+        this.rite = null;
+        this.faceTarget = null;
+        this.kneelTarget = 0;
+      }
+    }
+    this.planted = this.planted.filter((p) => {
+      p.t += dt;
+      if (p.t > 180) {
+        this.scene.remove(p.g);
+        return false;
+      }
+      return true;
+    });
   }
 
   /* ---------------- the living temple ---------------- */
@@ -1451,6 +1579,7 @@ export class TempleScene {
 
   private updateLiving(dt: number) {
     const t = this.elapsed;
+    this.updateRite(dt);
     this.hall?.update(t, dt);
     this.updateGaze(dt);
     this.updateScape(dt);

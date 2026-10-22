@@ -46,7 +46,9 @@ export class HallAtmosphere {
   readonly faces: THREE.Vector3[];
   private mode: 'day' | 'twilight' | 'night' = 'day';
 
+  private scene: THREE.Scene;
   constructor(scene: THREE.Scene, ground: Ground, o: { hallZ: number; hallD: number; frontZ: number; floorY: number; altarZ: number }) {
+    this.scene = scene;
     const F = o.floorY;
     const back = o.hallZ - o.hallD / 2;
     this.faces = [-1.7, 0, 1.7].map((x) => new THREE.Vector3(x, F + 4.0, o.altarZ - 1.0));
@@ -197,6 +199,12 @@ export class HallAtmosphere {
     this.day.visible = m === 'day';
     this.night.visible = m === 'night';
     this.shadowLight.castShadow = m === 'night';
+    // the altar's own glow: full by day, a low ember at night
+    const g = this.scene.getObjectByName('altarGlow') as THREE.PointLight | undefined;
+    if (g) {
+      g.intensity = m === 'night' ? 1.6 : m === 'twilight' ? 9 : 14;
+      g.color.setHex(m === 'night' ? 0xff4a20 : 0xffb45a);
+    }
   }
 
   update(t: number, dt: number) {

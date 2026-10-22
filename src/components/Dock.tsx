@@ -38,7 +38,8 @@ interface Props {
  * Centred with an inline transform so it never drifts off-screen.
  */
 export const Dock: React.FC<Props> = ({ spots, time, onTime, auto, onAuto, live, onLive, tour, onTour, onTeleport, onRitual, onBow, children }) => {
-  const [open, setOpen] = useState(true);
+  // on PC the bar stays out of the way until you press H; touch screens need it
+  const [open, setOpen] = useState(() => typeof window !== 'undefined' && !window.matchMedia?.('(pointer: fine)').matches);
   const [tab, setTab] = useState<'rituals' | 'goto' | 'time'>('rituals');
   useEffect(() => {
     const k = (e: KeyboardEvent) => {

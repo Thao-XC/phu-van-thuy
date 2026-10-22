@@ -13,7 +13,7 @@ import { LegendFilm } from './components/LegendFilm';
 import { useCalendar, CalendarChip, FestivalSheet, festivalKey, isFestivalDone, markFestivalDone } from './components/Calendar';
 import { liveTimeOfDay, today, type Festival } from './services/lunar';
 import { SECRETS, nextSecret } from './data/story';
-import { AltarModal, PetitionModal, StallModal } from './components/Rituals';
+import { AltarModal, PetitionModal, StallModal, XamSlip, drawXam } from './components/Rituals';
 import { IncenseRitual, XamRitual } from './components/RitualStage';
 import { HauDongSight, type CeremonyControl } from './components/HauDongSight';
 import { daySchedule, hauDongState, fmtHour, hourOf } from './services/templeDay';
@@ -25,7 +25,7 @@ import { luckService } from './services/luckService';
 import { storyService, useStory } from './services/storyService';
 import { useBackLayer } from './services/backStack';
 import { PALACES, type PalaceId } from './data/story';
-import type { LocKind } from './data/rituals';
+import { XAM_TIER, type LocKind, type Xam } from './data/rituals';
 
 type Modal = 'keeper' | 'incense' | 'altar' | 'fortune' | 'furnace' | 'stall' | 'journal' | 'settings' | 'controls' | 'lantern' | 'film' | 'calendar' | 'haudong' | null;
 
@@ -72,6 +72,12 @@ export default function App() {
   const rung = useRef('');
   const [watchCtl, setWatchCtl] = useState<CeremonyControl | null>(null);
   const [gaze, setGaze] = useState(0);
+  // first-person rites
+  const [rite, setRite] = useState<string | null>(null);
+  const [riteHint, setRiteHint] = useState<string | null>(null);
+  const [xamCard, setXamCard] = useState<Xam | null>(null);
+  const lastXam = useRef<Xam | null>(null);
+  const riteDone = useRef<(r: { kind: string; n?: number }) => void>(() => {});
   const [vision, setVision] = useState(false);
   const [auto, setAuto] = useState(false);
   const [tour, setTour] = useState(false);
@@ -123,6 +129,8 @@ export default function App() {
       },
       onReady: () => setLoading(false),
       onGaze: setGaze,
+      onRiteHint: setRiteHint,
+      onRiteDone: (r) => riteDone.current(r),
       onVision: () => {
         setVision(true);
         soundService.playTempleGong();
@@ -218,7 +226,7 @@ export default function App() {
   useEffect(() => {
     if (!import.meta.env.DEV || view !== 'temple') return;
     const r = new URLSearchParams(location.search).get('ritual');
-    if (r) window.setTimeout(() => setModal(r as Modal), 1500);
+    if (r) window.setTimeout(() => openRitualRef.current(r), 2500);
   }, [view]);
 
   // the hầu đồng is held (and heard) only during its sessions
@@ -344,6 +352,7 @@ export default function App() {
     setTimeout(() => scene.current?.enterRealm('realm-thien'), 2200);
   };
 
+  const openRitualRef = useRef<(k: string) => void>(() => {});
   const openRitual = (k: RitualKey | string) => {
     if (k === 'gate') return scene.current?.bow();
     if (k === 'bell') return ringBell();
@@ -360,16 +369,33 @@ export default function App() {
       }
       return showCaption(hd.next ? `The mat is empty for now. The next hầu đồng begins at ${fmtHour(hd.next.from)}.` : 'The hall is quiet tonight. Hầu đồng is held again tomorrow morning.', 5);
     }
-    if (k === 'keeper' || k === 'incense' || k === 'altar' || k === 'fortune' || k === 'furnace' || k === 'stall' || k === 'lantern') setModal(k as Modal);
+    if (k === 'incense' || k === 'altar' || k === 'fortune') return beginRite(k);
+    if (k === 'keeper' || k === 'furnace' || k === 'stall' || k === 'lantern') setModal(k as Modal);
   };
 
   // keyboard: E to interact
   useEffect(() => {
     if (view !== 'temple') return;
     const onKey = (e: KeyboardEvent) => {
+      if (rite) return;
       if (document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement) return;
-      if ((e.key === 'e' || e.key === 'E' || e.key === 'Enter') && near && !modal && !card && !inRealm) openRitual(near.type);
-      else if ((e.key === 'f' || e.key === 'F') && !modal && !card && !inRealm) setModal('film');
+      if ((e.key === 'e' || e.key === 'E' || e.key === 'Enter' || e.key === ' ') && near && !modal && !card && !inRealm && !arriving) {
+        e.preventDefault();
+        openRitual(near.type);
+      } else if ((e.key === 'p' || e.key === 'P') && !modal && !card && !inRealm && !arriving) {
+        if (near?.type === 'altar') beginRite('altar');
+        else if (scene.current && !scene.current.inRite) {
+          setRite('pray');
+          scene.current.startRite('pray');
+        }
+      } else if ((e.key === 'f' || e.key === 'F') && !modal && !card && !inRealm && !arriving) {
+        if (near?.type === 'fortune') beginRite('fortune');
+        else {
+          const sp = spots.find((x) => x.type === 'fortune');
+          if (sp) scene.current?.guideTo(sp.at[0], sp.at[1]);
+          showCaption('The fortune sticks wait on the red table inside the hall, on the right. The firefly will show you.', 4);
+        }
+      } else if ((e.key === 'l' || e.key === 'L') && !modal && !card && !inRealm) setModal('film');
       else if ((e.key === 'g' || e.key === 'G') && !modal && !card && !inRealm && !arriving) guide();
       else if ((e.key === 'j' || e.key === 'J') && !modal) openJournal();
       else if ((e.key === 't' || e.key === 'T') && !modal) openJournal('trail');
@@ -381,6 +407,49 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  });
+
+  openRitualRef.current = (k) => openRitual(k);
+  // rites done with your own hands, in the temple itself
+  const beginRite = (k: 'incense' | 'altar' | 'fortune') => {
+    const s = scene.current;
+    if (!s || s.inRite) return;
+    setRite(k);
+    if (k === 'incense') s.startRite('incense');
+    else if (k === 'altar') s.startRite('pray');
+    else
+      s.startRite('xam', () => {
+        const x = drawXam(luckService.get().value);
+        lastXam.current = x;
+        return { n: x.n, verse: x.verse, color: XAM_TIER[x.tier].color };
+      });
+  };
+  riteDone.current = (r) => {
+    if (r.kind === 'incense' && r.n) {
+      const n = r.n;
+      if (n % 2 === 0) luckService.change(-1, 'Incense is offered in odd numbers: one, three or five');
+      else if (!visit.current.incense) luckService.change(2, `Lit ${n} stick${n > 1 ? 's' : ''} of incense with respect`);
+      visit.current.incense = true;
+      showCaption(n % 2 ? 'The smoke rises straight up from the ash.' : 'An old woman smiles kindly: "Odd numbers, dear. Even numbers are kept for mourning."', 5);
+      setRite(null);
+    } else if (r.kind === 'bow') {
+      const was = rite;
+      setRite(null);
+      if (was === 'altar') window.setTimeout(() => setModal('altar'), 300);
+      else if (was === 'pray') showCaption('A quiet prayer, carried up with the incense smoke.', 3);
+    } else if (r.kind === 'xam-drawn' && r.n) {
+      storyService.saveXam(r.n);
+      setXamCard(lastXam.current);
+    } else if (r.kind === 'xam') {
+      setXamCard(null);
+      setRite(null);
+    }
+  };
+  useBackLayer(view === 'temple' && !!rite, () => {
+    scene.current?.cancelRite();
+    setRite(null);
+    setRiteHint(null);
+    setXamCard(null);
   });
 
   // clicking a golden marker: use it if you're there, otherwise travel to it first
@@ -537,9 +606,23 @@ export default function App() {
       </div>
 
       {/* objective tracker: story goal + the current secret's riddle */}
-      {!inRealm && !loading && !arriving && modal !== 'haudong' && (
+      {!inRealm && !loading && !arriving && modal !== 'haudong' && !rite && (
         <div className={`fixed left-3 top-[calc(max(0.75rem,env(safe-area-inset-top))+3rem)] z-20 ${modal ? 'hidden sm:block' : ''}`}>
           <Tracker getDistance={getSecretDistance} isNight={time === 'night'} onOpenTrail={() => openJournal('trail')} onGuide={guide} />
+        </div>
+      )}
+
+      {/* what your hands do next */}
+      {riteHint && (
+        <div className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-30 max-w-[min(620px,92vw)] px-4 py-1.5 rounded-full bg-[#140b08]/55 backdrop-blur-sm text-center pointer-events-none rite-hint" key={riteHint}>
+          <p className="text-[13px] leading-snug text-[#fbeed2]">
+            {riteHint} <span className="opacity-60">· Esc</span>
+          </p>
+        </div>
+      )}
+      {xamCard && (
+        <div className="fixed right-4 top-20 z-30 w-[min(360px,90vw)] dh-paper rounded-md p-3 fest-in max-h-[70vh] overflow-y-auto">
+          <XamSlip x={xamCard} />
         </div>
       )}
 
@@ -605,8 +688,9 @@ export default function App() {
                 <>
                   <li className="flex gap-3"><span className="w-16 shrink-0 font-semibold text-[#8e1b1b]">↑ ↓ ← →</span>Walk and turn (or WASD). Hold Shift to hurry.</li>
                   <li className="flex gap-3"><span className="w-16 shrink-0 font-semibold text-[#8e1b1b]">Mouse</span>Click the view, then move to look around. Esc frees the mouse.</li>
-                  <li className="flex gap-3"><span className="w-16 shrink-0 font-semibold text-[#8e1b1b]">Click</span>A golden marker to go there. E or Enter uses what's in front of you.</li>
-                  <li className="flex gap-3"><span className="w-16 shrink-0 font-semibold text-[#8e1b1b]">J · T · F</span>Journal · secret trail · the legend film. <span className="text-[#6d5b49]">? shows every key.</span></li>
+                  <li className="flex gap-3"><span className="w-16 shrink-0 font-semibold text-[#8e1b1b]">Space</span>Use what's in front of you, with your own hands. Click a golden marker to go there.</li>
+                  <li className="flex gap-3"><span className="w-16 shrink-0 font-semibold text-[#8e1b1b]">B · P · F</span>Vái (bow) · pray · fortune sticks.</li>
+                  <li className="flex gap-3"><span className="w-16 shrink-0 font-semibold text-[#8e1b1b]">H · J · L</span>Menu bar · journal · the legend film. <span className="text-[#6d5b49]">? shows every key.</span></li>
                 </>
               ) : (
                 <>
@@ -647,11 +731,11 @@ export default function App() {
       {isPc && !inRealm && !modal && (
         <div className="hidden lg:flex fixed left-3 bottom-4 z-20 flex-col gap-1 px-3 py-2 rounded-xl bg-[#2a1410]/70 text-[#fbeed2] text-[12px] backdrop-blur-sm pointer-events-none">
           <span>{locked ? 'Mouse captured · Esc to release' : 'Click the view to look around'}</span>
-          <span className="opacity-80">↑↓←→ move · E use · F film · ? all keys</span>
+          <span className="opacity-80">↑↓←→ move · Space use · B vái · P pray · F xăm · H menu · ? keys</span>
         </div>
       )}
 
-      {!inRealm && !arriving && modal !== 'haudong' && (
+      {!inRealm && !arriving && modal !== 'haudong' && !rite && (
         <Dock
           spots={spots}
           time={time}
@@ -682,9 +766,9 @@ export default function App() {
           {near && !modal && PROMPT[near.type] && (
             <button
               onClick={() => openRitual(near.type)}
-              className="px-5 py-2.5 rounded-md dh-seal font-semibold text-sm cursor-pointer hover:scale-[1.03] active:scale-95 transition-transform"
+              className="flex items-center gap-2 pl-1.5 pr-3 py-1 rounded-full bg-[#140b08]/60 backdrop-blur-sm text-[#fbeed2] text-[13px] cursor-pointer hover:bg-[#140b08]/75 transition-colors"
             >
-              <span className="pointer-coarse:hidden opacity-80">[E] </span>
+              <kbd className="pointer-coarse:hidden px-1.5 py-0.5 rounded bg-[#b8382b] text-[11px] font-bold text-[#f3ead6]">Space</kbd>
               {PROMPT[near.type]}
             </button>
           )}

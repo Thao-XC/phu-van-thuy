@@ -749,6 +749,7 @@ export class VietKit {
     g.add(box(6, 0.04, 0.4, std({ color: 0x1a0d08 }), 0, 0.02, 1.75));
     // altar glow
     const glow = new THREE.PointLight(0xffb45a, 14, 14, 1.6);
+    glow.name = 'altarGlow';
     glow.position.set(0, 4.5, 2.5);
     g.add(glow);
     return g;

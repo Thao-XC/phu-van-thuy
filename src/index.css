@@ -160,3 +160,7 @@
 
 .vision-in { animation: visionIn 5.2s ease-in-out both; }
 @keyframes visionIn { 0% { opacity: 0; transform: scale(1.06) } 15% { opacity: 1; transform: none } 75% { opacity: 1 } 100% { opacity: 0 } }
+
+/* rite hints step back once read */
+.rite-hint { animation: riteHint 6s ease both; }
+@keyframes riteHint { 0% { opacity: 0; transform: translateY(6px) } 8% { opacity: 1; transform: none } 70% { opacity: 1 } 100% { opacity: .45 } }
