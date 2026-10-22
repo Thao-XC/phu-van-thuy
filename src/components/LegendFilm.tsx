@@ -69,6 +69,49 @@ const TitleCard: React.FC<{ n: number; vi: string; en: string; show: boolean }> 
   </g>
 );
 
+/** a sweep of điệp-paper clouds that covers the picture while it changes */
+const CloudWipe: React.FC = () => (
+  <g className="cloudwipe" pointerEvents="none">
+    <rect x={0} y={-60} width={2000} height={1020} fill={INK.diep} />
+    <rect x={0} y={-60} width={2000} height={1020} fill="url(#tx-swirl)" opacity={0.08} />
+    {[0, 150, 300, 450, 600, 750, 900].map((y, i) => (
+      <g key={y}>
+        <Cloud x={-40 + (i % 2) * 50} y={y} w={340} n={3} seed={100 + i} f={i % 3 === 1 ? INK.pink : INK.diep} />
+        <Cloud x={2040 - (i % 2) * 50} y={y + 70} w={340} n={3} seed={120 + i} f={i % 3 === 0 ? INK.hoeLight : INK.diep} />
+      </g>
+    ))}
+    {[200, 520, 840, 1160, 1480, 1800].map((x, i) => (
+      <Cloud key={x} x={x} y={i % 2 ? 300 : 620} w={300} n={4} seed={140 + i} f={i % 2 ? INK.pink : INK.hoeLight} />
+    ))}
+  </g>
+);
+
+/** something always moving in the air: petals, fireflies or embers */
+const Ambient: React.FC<{ kind: 'petals' | 'motes' | 'embers' }> = ({ kind }) => (
+  <g pointerEvents="none">
+    {Array.from({ length: kind === 'petals' ? 14 : 22 }, (_, i) => {
+      const x = (i * 337) % 1700 - 50;
+      const delay = -((i * 1.37) % 9);
+      if (kind === 'petals')
+        return (
+          <g key={i} transform={`translate(${x} -40)`}>
+            <g className="amb-petal" style={{ animationDelay: `${delay}s`, animationDuration: `${8 + (i % 4)}s` }}>
+              <path d="M0 0q9 -11 18 0q-9 11 -18 0Z" fill={i % 3 ? INK.pink : '#f6d9cc'} stroke={INK.key} strokeWidth={1.4} />
+            </g>
+          </g>
+        );
+      return (
+        <g key={i} transform={`translate(${x} ${940})`}>
+          <g className="amb-mote" style={{ animationDelay: `${delay}s`, animationDuration: `${7 + (i % 5)}s` }}>
+            <circle r={kind === 'embers' ? 3.2 : 4} fill={kind === 'embers' ? '#ffd27a' : '#fff1b0'} />
+            <circle r={12} fill="url(#glow-gold)" />
+          </g>
+        </g>
+      );
+    })}
+  </g>
+);
+
 export const LegendFilm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [started, setStarted] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -119,6 +162,23 @@ export const LegendFilm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     const t = window.setTimeout(() => setCard(false), CARD_MS);
     return () => clearTimeout(t);
   }, [ch, started]);
+
+  // what's on screen trails the story by a beat: big changes happen behind a sweep of điệp clouds
+  const [shown, setShown] = useState({ ch: 0, beat: 0, card: false });
+  const [wipe, setWipe] = useState(0);
+  useEffect(() => {
+    const target = { ch, beat: card ? 0 : ln, card };
+    if (target.ch === shown.ch && target.beat === shown.beat && target.card === shown.card) return;
+    const big = !started || target.ch !== shown.ch || target.card !== shown.card || (SCENES[FILM[ch].id].wipeAt ?? []).includes(target.beat);
+    if (!big || !started) {
+      setShown(target);
+      return;
+    }
+    setWipe((w) => w + 1);
+    const t = window.setTimeout(() => setShown(target), 1000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ch, ln, card, started]);
 
   // music: chầu văn under the hầu đồng, a quiet pentatonic đàn nguyệt elsewhere
   const isHauDong = FILM[ch].id === 'haudong';
@@ -223,8 +283,9 @@ export const LegendFilm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   };
 
   const chapter = FILM[ch];
-  const def = SCENES[chapter.id];
-  const beat = card ? 0 : ln;
+  const vChapter = FILM[shown.ch];
+  const def = SCENES[vChapter.id];
+  const beat = shown.beat;
   const cam = def.cams[Math.min(beat, def.cams.length - 1)];
   const line = chapter.lines[ln];
   const total = useMemo(() => FILM.reduce((n, c) => n + c.lines.length, 0), []);
@@ -255,12 +316,16 @@ export const LegendFilm: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           <g clipPath="url(#film-clip)">
             <Paper wash={def.wash(beat)} />
             <CamCtx.Provider value={cam}>
-              <g key={chapter.id} className="printing">
-                <Body beat={beat} />
+              <g key={vChapter.id} className="printing">
+                <g className="kb">
+                  <Body beat={beat} />
+                </g>
               </g>
             </CamCtx.Provider>
+            <Ambient kind={def.ambient ?? 'petals'} key={`amb-${vChapter.id}`} />
             <PaperTop dim={def.dim?.(beat) ?? 0} />
-            {started && <TitleCard key={`card-${ch}`} n={ch} vi={chapter.vi} en={chapter.en} show={card} />}
+            {started && <TitleCard key={`card-${shown.ch}`} n={shown.ch} vi={vChapter.vi} en={vChapter.en} show={shown.card} />}
+            {wipe > 0 && <CloudWipe key={wipe} />}
           </g>
         </svg>
 

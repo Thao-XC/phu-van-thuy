@@ -35,6 +35,10 @@ export interface SceneDef {
   dim?: (beat: number) => number;
   cams: Cam[];
   Body: React.FC<{ beat: number }>;
+  /** beats where the picture changes completely: hidden behind a cloud sweep */
+  wipeAt?: number[];
+  /** what floats in the air */
+  ambient?: 'petals' | 'motes' | 'embers';
 }
 
 const Label: React.FC<{ x: number; y: number; vi: string; en?: string; c?: string }> = ({ x, y, vi, en, c = INK.son }) => (
@@ -612,37 +616,47 @@ export const SCENES: Record<FilmScene, SceneDef> = {
     wash: () => '#efdcae',
     cams: [{ x: 800, y: 470, z: 1 }, { x: 800, y: 300, z: 1.16 }, { x: 800, y: 450, z: 1 }, { x: 800, y: 520, z: 1.12 }],
     Body: Origins,
+    wipeAt: [2, 3],
   },
   palaces: {
     wash: () => '#f0d3be',
     cams: [{ x: 800, y: 380, z: 1.25 }, { x: 800, y: 470, z: 1 }, { x: 620, y: 480, z: 1.22, t: 3.4 }, { x: 1300, y: 480, z: 1.55 }, { x: 800, y: 560, z: 0.9 }],
     Body: Palaces,
+    ambient: 'motes',
   },
   cup: {
     wash: (b) => (b >= 3 ? '#ecd9a8' : '#f3d4c4'),
     cams: [{ x: 800, y: 470, z: 1 }, { x: 640, y: 640, z: 1.75 }, { x: 800, y: 1180, z: 0.82, t: 6.5 }, { x: 800, y: 1560, z: 1, t: 3 }, { x: 800, y: 1380, z: 0.86, t: 5 }],
     Body: Cup,
+    wipeAt: [3],
   },
   return: {
     wash: (b) => (b === 3 ? '#cbb48c' : '#efe0bd'),
     dim: (b) => (b === 3 ? 0.12 : 0),
     cams: [{ x: 800, y: 480, z: 1 }, { x: 2470, y: 520, z: 1.05, t: 5.5 }, { x: 800, y: 450, z: 1 }, { x: 800, y: 450, z: 1 }],
     Body: Return,
+    wipeAt: [2, 3],
+    ambient: 'petals',
   },
   forest: {
     wash: () => '#e6e2bd',
     cams: [{ x: 800, y: 470, z: 1 }, { x: 2420, y: 470, z: 1, t: 4.5 }, { x: 1600, y: 1420, z: 1, t: 4.5 }],
     Body: Forest,
+    ambient: 'petals',
   },
   haudong: {
     wash: () => '#b7553d',
     cams: [{ x: 800, y: 470, z: 1 }, { x: 800, y: 600, z: 1.35 }, { x: 800, y: 500, z: 1.06 }, { x: 800, y: 560, z: 1.28 }],
     Body: HauDong,
+    wipeAt: [2, 3],
+    ambient: 'embers',
   },
   heritage: {
     wash: (b) => (b === 0 ? '#cfc2a2' : b === 1 ? '#efdcae' : '#e7c79a'),
     dim: (b) => (b === 0 ? 0.22 : b >= 3 ? 0.18 : 0.05),
     cams: [{ x: 760, y: 560, z: 1.18 }, { x: 800, y: 450, z: 1 }, { x: 800, y: 470, z: 1 }, { x: 800, y: 400, z: 0.92, t: 5 }],
     Body: Heritage,
+    wipeAt: [1, 2],
+    ambient: 'motes',
   },
 };

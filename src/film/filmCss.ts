@@ -19,7 +19,7 @@ export const FILM_CSS = `
 .glint { animation: glint 5s ease-in-out infinite alternate; }
 @keyframes glint { from { opacity: .35 } to { opacity: .85 } }
 
-.film-paused [class*="a-"] { animation-play-state: paused !important; }
+.film-paused [class*="a-"], .film-paused .kb, .film-paused [class*="amb-"] { animation-play-state: paused !important; }
 
 /* life */
 .a-breathe { animation: breathe 3.4s ease-in-out infinite alternate; }
@@ -129,6 +129,16 @@ export const FILM_CSS = `
 @keyframes floatx { from { transform: translateX(0) } to { transform: translateX(2000px) } }
 .a-rise { animation: rise 10s ease-in infinite both; }
 @keyframes rise { 0% { transform: translateY(0); opacity: 0 } 10% { opacity: 1 } 100% { transform: translateY(-1150px); opacity: .25 } }
+
+/* a slow living camera inside every shot, so nothing ever stands still */
+.kb { transform-origin: 800px 450px; animation: kb 14s ease-in-out infinite alternate; }
+@keyframes kb { from { transform: scale(1) translate(10px, 4px) } to { transform: scale(1.05) translate(-14px, -8px) } }
+.cloudwipe { animation: cloudwipe 2.2s cubic-bezier(.55,.05,.45,.95) both; }
+@keyframes cloudwipe { 0% { transform: translateX(1750px) } 42% { transform: translateX(-20px) } 58% { transform: translateX(-380px) } 100% { transform: translateX(-2600px) } }
+.amb-petal { animation: petal 9s linear infinite; }
+@keyframes petal { 0% { transform: translate(0,0) rotate(0) } 25% { transform: translate(-60px,240px) rotate(120deg) } 50% { transform: translate(20px,480px) rotate(220deg) } 75% { transform: translate(-80px,720px) rotate(330deg) } 100% { transform: translate(-30px,980px) rotate(420deg) } }
+.amb-mote { animation: mote 8s ease-in-out infinite; }
+@keyframes mote { 0% { transform: translate(0,0); opacity: 0 } 15% { opacity: 1 } 50% { transform: translate(40px,-460px) } 85% { opacity: .8 } 100% { transform: translate(-20px,-960px); opacity: 0 } }
 
 @media (prefers-reduced-motion: reduce) {
   [class*="a-"], .printing .ink { animation-duration: .01s !important; animation-iteration-count: 1 !important; }
