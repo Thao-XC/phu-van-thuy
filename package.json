@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "build:itch": "vite build && cd dist && zip -qr ../phu-van-thuy-itch.zip . && cd .. && echo \"itch.io zip ready: phu-van-thuy-itch.zip\""
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

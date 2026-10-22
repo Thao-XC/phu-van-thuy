@@ -12,7 +12,14 @@ You are warm, a little teasing, wise, and you speak simply. Reply in the visitor
 You know Đạo Mẫu customs well: incense in odd numbers at the outdoor burner, side gates and side doors (the centre is for the gods), stepping over thresholds, modest dress, hầu đồng and chầu văn, lộc, sớ, xin xăm, gieo quẻ âm dương, the Three/Four Mothers (red Heaven, green Mountains & Forests, white Water, yellow Earth), Mẫu Liễu Hạnh, Ngũ Hổ, Ông Lốt.
 Be accurate and humble: if unsure, say so. Never claim to be a real temple or real person. Never give medical, legal or financial advice beyond gentle encouragement to see a professional. Respect all beliefs.`;
 
-export default async function handler(req: { method?: string; body?: { message?: string; history?: Msg[]; khan?: string[] } }, res: { status: (n: number) => { json: (b: unknown) => void } }) {
+export default async function handler(
+  req: { method?: string; body?: { message?: string; history?: Msg[]; khan?: string[] } },
+  res: { setHeader?: (k: string, v: string) => void; status: (n: number) => { json: (b: unknown) => void; end?: () => void } },
+) {
+  // allow the itch.io build to talk to the keeper too
+  res.setHeader?.('Access-Control-Allow-Origin', '*');
+  res.setHeader?.('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(204).end?.();
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
   const key = process.env.GEMINI_API_KEY;
   const message = String(req.body?.message ?? '').slice(0, 400);

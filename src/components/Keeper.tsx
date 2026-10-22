@@ -60,7 +60,7 @@ export const KeeperSheet: React.FC<{ onClose: () => void; onStart: () => void }>
     setBusy(true);
     let reply = '';
     try {
-      const r = await fetch('/api/keeper', {
+      const r = await fetch(import.meta.env.VITE_KEEPER_URL || './api/keeper', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: q, history: msgs.slice(-6), khan: story.khan }),

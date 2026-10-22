@@ -52,3 +52,14 @@ Optional: set `GEMINI_API_KEY` (see `.env.example`) so the temple keeper can ans
 `api/keeper.ts`. Without it she uses built-in answers.
 
 Phủ Vân Thủy is fictional, made with respect for Đạo Mẫu, whose rituals UNESCO recognised as Intangible Cultural Heritage in 2016.
+
+## Publishing on itch.io
+
+1. `npm run build:itch` (or `npm run build` and zip the *contents* of `dist/`, with `index.html` at the top level).
+2. On itch.io: **Create new project** → Kind of project: **HTML** → upload `phu-van-thuy-itch.zip` →
+   tick **This file will be played in the browser**.
+3. Embed options: viewport **1280 × 720**, tick **Fullscreen button** and **Click to launch in fullscreen**
+   (recommended for mouse-look), and **Mobile friendly** if you want phones too.
+4. The temple keeper's AI replies need the Vercel API. To use it from itch, build with
+   `VITE_KEEPER_URL=https://<your-vercel-app>/api/keeper npm run build:itch`; without it she answers from her
+   built-in knowledge. Progress is saved in the player's browser (itch's game domain).

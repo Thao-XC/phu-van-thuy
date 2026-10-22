@@ -5,6 +5,8 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    // relative asset paths: the same build works on Vercel and inside itch.io's iframe
+    base: './',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
