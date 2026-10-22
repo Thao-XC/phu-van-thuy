@@ -140,6 +140,12 @@ export const FILM_CSS = `
 .amb-mote { animation: mote 8s ease-in-out infinite; }
 @keyframes mote { 0% { transform: translate(0,0); opacity: 0 } 15% { opacity: 1 } 50% { transform: translate(40px,-460px) } 85% { opacity: .8 } 100% { transform: translate(-20px,-960px); opacity: 0 } }
 
+/* prologue */
+.scarf-fly { animation: scarffly 2.2s cubic-bezier(.5,0,.4,1) both; }
+@keyframes scarffly { 0% { transform: translate(0,0) rotate(0) } 30% { transform: translate(calc(var(--tx) * .15), -60px) rotate(-20deg) } 100% { transform: translate(var(--tx), var(--ty)) rotate(220deg); opacity: 0 } }
+.fade-late { animation: press .8s ease-out both; }
+.hotspot:hover { filter: brightness(1.12); }
+
 @media (prefers-reduced-motion: reduce) {
   [class*="a-"], .printing .ink { animation-duration: .01s !important; animation-iteration-count: 1 !important; }
 }

@@ -1,10 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { KhanArt } from './LocArt';
 import { PALACES } from '../data/story';
 import { useStory, storyService } from '../services/storyService';
 import { luckService } from '../services/luckService';
 import { useCalendar, lunarLabel } from './Calendar';
 import { yearName } from '../services/lunar';
+import { Prologue } from './Prologue';
 
 /** Hanging red lantern, drawn in SVG */
 const Lantern: React.FC<{ x: string; delay: number; s?: number }> = ({ x, delay, s = 1 }) => (
@@ -28,18 +29,32 @@ const Lantern: React.FC<{ x: string; delay: number; s?: number }> = ({ x, delay,
 );
 
 export const Landing: React.FC<{ onEnter: () => void; onWatch: () => void }> = ({ onEnter, onWatch }) => {
+  const beginRef = useRef<() => void>(() => {});
   // keyboard: Enter goes in
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && !document.querySelector('[role=dialog]') && document.activeElement === document.body) onEnter();
+      if (e.key === 'Enter' && !document.querySelector('[role=dialog]') && document.activeElement === document.body) beginRef.current();
     };
     window.addEventListener('keydown', k);
     return () => window.removeEventListener('keydown', k);
   }, [onEnter]);
   const story = useStory();
   const begun = story.started || story.khan.length > 0;
+  const [tale, setTale] = useState(false);
+  // first-time visitors hear the story before going in
+  const begin = () => (begun ? onEnter() : setTale(true));
+  beginRef.current = begin;
   return (
     <div className="fixed inset-0 overflow-y-auto bg-[radial-gradient(ellipse_at_top,#5a1a14_0%,#2a1410_55%,#160a08_100%)] text-[#fbeed2]">
+      {tale && (
+        <Prologue
+          onClose={() => setTale(false)}
+          onEnter={() => {
+            setTale(false);
+            onEnter();
+          }}
+        />
+      )}
       {/* faint karst silhouettes */}
       <svg className="absolute bottom-0 left-0 w-full h-[45vh] opacity-40 pointer-events-none" viewBox="0 0 400 120" preserveAspectRatio="none" aria-hidden>
         <path d="M0 120V80Q10 40 22 70Q30 20 44 60Q52 30 64 66Q80 10 96 62Q106 50 114 74Q130 30 146 70Q160 40 172 80Q190 20 208 66Q220 50 230 76Q246 26 262 64Q276 40 288 78Q304 30 320 66Q332 50 344 74Q360 24 376 68Q388 50 400 72V120Z" fill="#0f0705" />
@@ -71,14 +86,19 @@ export const Landing: React.FC<{ onEnter: () => void; onWatch: () => void }> = (
         </p>
 
         <div className="mt-8 flex flex-col sm:flex-row gap-3 items-center">
-          <button onClick={onEnter} className="px-8 py-3.5 rounded-2xl bg-[#c99212] hover:bg-[#dba51e] text-[#2a1410] font-bold text-base shadow-[0_8px_30px_rgba(201,146,18,0.35)] cursor-pointer transition-colors">
-            {begun ? `Continue · ${story.khan.length} of 4 scarves` : 'Enter the temple'}
+          <button onClick={begin} className="px-8 py-3.5 rounded-2xl bg-[#c99212] hover:bg-[#dba51e] text-[#2a1410] font-bold text-base shadow-[0_8px_30px_rgba(201,146,18,0.35)] cursor-pointer transition-colors">
+            {begun ? `Continue · ${story.khan.length} of 4 scarves` : 'Begin the story'}
             <kbd className="hidden pointer-fine:inline ml-2 px-1.5 rounded border border-[#2a1410]/30 text-[11px] font-sans font-semibold">Enter</kbd>
           </button>
           <button onClick={onWatch} className="flex items-center gap-2 px-5 py-3 rounded-2xl border border-[#e9b84a]/60 text-[#fbeed2] hover:bg-white/10 font-semibold cursor-pointer">
             <span className="w-6 h-6 rounded-full bg-[#8e1b1b] flex items-center justify-center text-[11px]">▶</span>
             Watch the legend of the Mothers
           </button>
+          {begun && (
+            <button onClick={() => setTale(true)} className="px-4 py-2 rounded-xl text-sm text-[#e8cfa0] hover:text-white underline-offset-4 hover:underline cursor-pointer">
+              Retell the story
+            </button>
+          )}
           {begun && (
             <button
               onClick={() => {

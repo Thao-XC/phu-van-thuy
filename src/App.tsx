@@ -415,11 +415,12 @@ export default function App() {
         <div className="hidden min-[520px]:flex items-center gap-2 px-3 py-2 rounded-xl dh-paper border border-[#211a15] shadow-md text-xs">
           <span className="text-[#4a3826] font-semibold">Phủ Vân Thủy</span>
         </div>
-        <CalendarChip lunar={cal.lunar} festival={cal.festival} onClick={() => setModal('calendar')} />
+
       </div>
 
       {/* top-right: phúc, scarves, journal, sound */}
       <div className="fixed top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-30 flex items-center gap-1.5 sm:gap-2">
+        <CalendarChip now={cal.now} lunar={cal.lunar} festival={cal.festival} onClick={() => setModal('calendar')} />
         <LuckChip onClick={() => setShowPhuc(true)} compact />
         <button onClick={() => openJournal()} className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-xl dh-paper border border-[#211a15] shadow-md cursor-pointer hover:border-[#8e1b1b]" aria-label={`Journal: ${story.khan.length} of 4 scarves`}>
           <span className="flex -space-x-2.5">

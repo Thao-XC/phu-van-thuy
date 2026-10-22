@@ -42,14 +42,19 @@ export function useCalendar() {
 const MONTHS = ['Giêng', 'Hai', 'Ba', 'Tư', 'Năm', 'Sáu', 'Bảy', 'Tám', 'Chín', 'Mười', 'Một', 'Chạp'];
 export const lunarLabel = (l: LunarDate) => `${l.day} tháng ${MONTHS[l.month - 1]}${l.leap ? ' (nhuận)' : ''}`;
 
-export const CalendarChip: React.FC<{ onClick: () => void; lunar: LunarDate; festival: Festival | null }> = ({ onClick, lunar, festival }) => (
+export const CalendarChip: React.FC<{ onClick: () => void; now: Date; lunar: LunarDate; festival: Festival | null }> = ({ onClick, now, lunar, festival }) => (
   <button
     onClick={onClick}
-    className={`hidden min-[420px]:flex items-center gap-2 px-3 py-1.5 rounded-md text-xs cursor-pointer ${festival?.major ? 'dh-seal' : 'dh-paper'}`}
-    title="Today on the lunar calendar"
+    className={`flex flex-col items-end leading-tight px-2.5 sm:px-3 py-1 rounded-md cursor-pointer ${festival?.major ? 'dh-seal' : 'dh-paper'}`}
+    title={festival ? `${festival.vi} · ${festival.en}` : 'The temple calendar'}
+    aria-label={`Today: ${now.toDateString()}, lunar ${lunarLabel(lunar)}${festival ? `, ${festival.en}` : ''}`}
   >
-    <span className="font-display font-bold">{lunarLabel(lunar)}</span>
-    {festival && <span className="font-semibold truncate max-w-[12rem]">· {festival.vi}</span>}
+    <span className="text-[10px] sm:text-[11px] opacity-80 tabular-nums">{now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+    <span className="text-[11px] sm:text-xs font-display font-bold whitespace-nowrap">
+      <span className="sm:hidden">{lunar.day}/{lunar.month} ÂL</span>
+      <span className="hidden sm:inline">{lunarLabel(lunar)} ÂL</span>
+      {festival && <span className="hidden lg:inline font-semibold"> · {festival.vi}</span>}
+    </span>
   </button>
 );
 

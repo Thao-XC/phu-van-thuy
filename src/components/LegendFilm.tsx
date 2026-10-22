@@ -70,7 +70,7 @@ const TitleCard: React.FC<{ n: number; vi: string; en: string; show: boolean }> 
 );
 
 /** a sweep of điệp-paper clouds that covers the picture while it changes */
-const CloudWipe: React.FC = () => (
+export const CloudWipe: React.FC = () => (
   <g className="cloudwipe" pointerEvents="none">
     <rect x={0} y={-60} width={2000} height={1020} fill={INK.diep} />
     <rect x={0} y={-60} width={2000} height={1020} fill="url(#tx-swirl)" opacity={0.08} />
@@ -87,7 +87,7 @@ const CloudWipe: React.FC = () => (
 );
 
 /** something always moving in the air: petals, fireflies or embers */
-const Ambient: React.FC<{ kind: 'petals' | 'motes' | 'embers' }> = ({ kind }) => (
+export const Ambient: React.FC<{ kind: 'petals' | 'motes' | 'embers' }> = ({ kind }) => (
   <g pointerEvents="none">
     {Array.from({ length: kind === 'petals' ? 14 : 22 }, (_, i) => {
       const x = (i * 337) % 1700 - 50;
