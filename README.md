@@ -21,6 +21,13 @@ viết & hóa sớ (write and burn a petition), thỉnh bùa / nhận lộc (cha
 **Phúc.** Real temple etiquette counts: side gates and doors (the centre is for the gods), stepping over thresholds,
 walking calmly, odd-numbered incense, not hoarding lộc. Good manners and discoveries build phúc, which tilts the fortune sticks.
 
+**On PC.** Click the view to capture the mouse and look around freely (Esc releases it). WASD to walk, E to use,
+B to vái, J for the journal, M for the minimap, ? for all keys. Settings: mouse sensitivity, invert Y, field of view,
+graphics quality, minimap.
+
+**Floating lanterns.** At the river landing you can set a lotus lantern (đèn hoa đăng) on the water with a wish,
+and watch it drift away. Lovelier at night.
+
 **Navigation.** Esc, the browser back button and Android's back gesture always step back one level.
 
 ## Run

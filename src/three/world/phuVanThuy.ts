@@ -288,6 +288,7 @@ export const phuVanThuy: Layout = (ctx) => {
     { id: 'altar', type: 'altar', name: 'Altar of the Four Palaces', vi: 'Ban thờ Tứ phủ', at: [0, -9.4], look: [0, -15], r: 3.6 },
     { id: 'fortune', type: 'fortune', name: 'Fortune sticks', vi: 'Xin xăm', at: [6.8, -9], look: [8.8, -9], r: 2.4 },
     { id: 'bell', type: 'bell', name: 'Bell tower', vi: 'Gác chuông', at: [18, -8], look: [BELL.x, BELL.z] },
+    { id: 'river', type: 'river', name: 'Lantern landing', vi: 'Bến thả đèn', at: [0, 63], look: [0, 74], r: 3.4 },
     { id: 'pond', type: 'view', name: 'Half-moon lotus pond', vi: 'Hồ bán nguyệt', at: [-5, 47], look: [POND.x, POND.z] },
     { id: 'banyan', type: 'view', name: 'The old banyan', vi: 'Cây đa', at: [-8, 26], look: [BANYAN.x, BANYAN.z] },
     { id: 'grotto', type: 'view', name: 'Mountain grotto', vi: 'Sơn trang', at: [-18, -12], look: [GROTTO.x, GROTTO.z] },
@@ -355,6 +356,8 @@ export const phuVanThuy: Layout = (ctx) => {
     bobbingWater: river,
     onTime: (time: 'day' | 'twilight' | 'night') => {
       const k = time === 'night' ? 1 : time === 'twilight' ? 0.55 : 0;
+      (river.material as THREE.MeshStandardMaterial).color.setHex(time === 'night' ? 0x123232 : time === 'twilight' ? 0x2a5e5a : 0x2f6f6a);
+      (pond.material as THREE.MeshStandardMaterial).color.setHex(time === 'night' ? 0x16302a : 0x356b4f);
       lights.forEach((l) => (l.intensity = 22 * k));
       lanterns.forEach((l) => {
         const mat = l.userData.glowMat as THREE.MeshStandardMaterial;

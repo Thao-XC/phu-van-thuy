@@ -116,6 +116,7 @@ export class TempleScene {
   public previousPointerPos = { x: 0, y: 0 };
 
   private isRunning = false;
+  private bobT = 0;
   private lastTime = 0;
   private animFrameId: number | null = null;
 
@@ -531,6 +532,7 @@ export class TempleScene {
     dom.addEventListener('pointerdown', this.onPointerDown);
     window.addEventListener('pointermove', this.onPointerMove);
     window.addEventListener('pointerup', this.onPointerUp);
+    document.addEventListener('pointerlockchange', this.lockListener);
   }
 
   private onKeyDown = (e: KeyboardEvent) => {
@@ -542,22 +544,118 @@ export class TempleScene {
     this.keysPressed[e.code] = false;
   };
 
+  /* ---------------- PC controls ---------------- */
+  /** mouse-look settings, changed from the settings panel */
+  public look = { sensitivity: 1, invertY: false, pointerLock: true };
+  /** called when pointer lock starts or ends, so the UI can show the crosshair */
+  public onPointerLockChange: ((locked: boolean) => void) | null = null;
+  private lockListener = () => this.onPointerLockChange?.(document.pointerLockElement === this.renderer.domElement);
+
+  public get pointerLocked() {
+    return document.pointerLockElement === this.renderer.domElement;
+  }
+  public releasePointer() {
+    if (this.pointerLocked) document.exitPointerLock?.();
+  }
+
+  private turn(dx: number, dy: number, scale: number) {
+    const k = scale * this.look.sensitivity;
+    this.playerRotationY -= dx * k;
+    this.playerPitch -= dy * k * (this.look.invertY ? -1 : 1);
+    this.playerPitch = Math.max(-Math.PI / 2.4, Math.min(Math.PI / 2.4, this.playerPitch));
+  }
+
   private onPointerDown = (e: PointerEvent) => {
+    // PC: a click on the view captures the mouse for free looking (Esc releases it)
+    if (e.pointerType === 'mouse' && this.look.pointerLock && !this.pointerLocked && e.button === 0) {
+      try {
+        const r = this.renderer.domElement.requestPointerLock?.() as unknown as Promise<void> | undefined;
+        r?.catch?.(() => {});
+      } catch {
+        /* not allowed here: fall back to dragging */
+      }
+    }
     this.isDragging = true;
     this.previousPointerPos = { x: e.clientX, y: e.clientY };
   };
 
   private onPointerMove = (e: PointerEvent) => {
+    if (this.pointerLocked) {
+      this.turn(e.movementX, e.movementY, 0.0022);
+      return;
+    }
     if (!this.isDragging) return;
     const deltaX = e.clientX - this.previousPointerPos.x;
     const deltaY = e.clientY - this.previousPointerPos.y;
     this.previousPointerPos = { x: e.clientX, y: e.clientY };
-
-    const sensitivity = 0.0035;
-    this.playerRotationY -= deltaX * sensitivity;
-    this.playerPitch -= deltaY * sensitivity;
-    this.playerPitch = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, this.playerPitch));
+    this.turn(deltaX, deltaY, 0.0035);
   };
+
+  /** graphics quality: high has shadows and a sharper image */
+  public setQuality(q: 'high' | 'low') {
+    const headless = navigator.webdriver;
+    this.renderer.shadowMap.enabled = q === 'high' && !headless;
+    this.sunLight.castShadow = q === 'high' && !headless;
+    this.renderer.setPixelRatio(headless ? 1 : q === 'high' ? Math.min(window.devicePixelRatio, 2) : 1);
+    this.scene.traverse((o) => {
+      const m = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+      if (m) (Array.isArray(m) ? m : [m]).forEach((mm) => (mm.needsUpdate = true));
+    });
+    this.onWindowResize();
+  }
+  public setFov(fov: number) {
+    this.camera.fov = fov;
+    this.camera.updateProjectionMatrix();
+  }
+
+  /* ---------------- floating lanterns (thả đèn hoa đăng) ---------------- */
+  private lanterns: { g: THREE.Group; vx: number; vz: number; light?: THREE.PointLight; t0: number }[] = [];
+  /** Set a lotus lantern on the river; it drifts away with the current */
+  public floatLantern(color: number) {
+    const g = new THREE.Group();
+    const petal = new THREE.MeshStandardMaterial({ color, roughness: 0.6, emissive: color, emissiveIntensity: 0.25, side: THREE.DoubleSide });
+    for (let ring = 0; ring < 2; ring++)
+      for (let k = 0; k < 8; k++) {
+        const p = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), petal);
+        const a = (k / 8) * Math.PI * 2 + ring * 0.4;
+        const r = ring ? 0.13 : 0.22;
+        p.scale.set(0.55, 1.25, 0.3);
+        p.position.set(Math.cos(a) * r, 0.12 + ring * 0.06, Math.sin(a) * r);
+        p.lookAt(Math.cos(a) * 2, 1.4, Math.sin(a) * 2);
+        g.add(p);
+      }
+    const leaf = new THREE.Mesh(new THREE.CircleGeometry(0.42, 16), new THREE.MeshStandardMaterial({ color: 0x4f8a3e, side: THREE.DoubleSide }));
+    leaf.rotation.x = -Math.PI / 2;
+    g.add(leaf);
+    const candle = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.12, 8), new THREE.MeshStandardMaterial({ color: 0xfff2d0 }));
+    candle.position.y = 0.12;
+    g.add(candle);
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.09, 6), new THREE.MeshBasicMaterial({ color: 0xffc35a }));
+    flame.position.y = 0.23;
+    g.add(flame);
+    g.position.set((Math.random() - 0.5) * 2, -0.3, 67);
+    this.scene.add(g);
+    let light: THREE.PointLight | undefined;
+    if (this.lanterns.filter((l) => l.light).length < 5) {
+      light = new THREE.PointLight(0xffb45a, 3, 7, 2);
+      light.position.y = 0.4;
+      g.add(light);
+    }
+    this.lanterns.push({ g, vx: (Math.random() - 0.5) * 0.25, vz: 0.35 + Math.random() * 0.2, light, t0: this.elapsed });
+    if (this.lanterns.length > 24) {
+      const old = this.lanterns.shift()!;
+      this.scene.remove(old.g);
+    }
+  }
+  private updateLanterns(dt: number) {
+    for (const l of this.lanterns) {
+      const age = this.elapsed - l.t0;
+      l.g.position.x += (l.vx + Math.sin(age * 0.4) * 0.08) * dt;
+      l.g.position.z += l.vz * dt;
+      l.g.position.y = -0.3 + Math.sin(age * 1.6) * 0.025;
+      l.g.rotation.y += dt * 0.15;
+    }
+  }
 
   private onPointerUp = () => {
     this.isDragging = false;
@@ -588,6 +686,7 @@ export class TempleScene {
     this.updateEncounter(delta);
     this.updateManners(delta);
     this.updateParticles(delta);
+    this.updateLanterns(delta);
     if (this.nature) {
       const t = now / 1000;
       this.nature.animated.forEach((a) => a.update(t));
@@ -717,6 +816,9 @@ export class TempleScene {
 
     // Smooth camera update
     this.camera.position.copy(this.playerPosition);
+    // a gentle head bob while walking
+    this.bobT = moved ? this.bobT + delta * (running ? 13 : 9) : this.bobT * 0.9;
+    if (moved) this.camera.position.y += Math.sin(this.bobT) * 0.035;
     if (this.enc?.rt?.underwater) this.camera.position.y += Math.sin(this.elapsed * 1.6) * 0.18;
     if (this.shakeT > 0) {
       this.shakeT -= delta;
@@ -1159,6 +1261,8 @@ export class TempleScene {
     dom.removeEventListener('pointerdown', this.onPointerDown);
     window.removeEventListener('pointermove', this.onPointerMove);
     window.removeEventListener('pointerup', this.onPointerUp);
+    document.removeEventListener('pointerlockchange', this.lockListener);
+    this.releasePointer();
 
     this.pmremGenerator.dispose();
     this.renderer.dispose();

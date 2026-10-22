@@ -3,7 +3,7 @@ import { ChevronDown, ChevronUp, Sun, Sunset, Moon, Plane, RefreshCw } from 'luc
 import type { SpotDef } from '../three/world/types';
 import type { TimeOfDay } from '../three/TempleScene';
 
-export type RitualKey = 'keeper' | 'incense' | 'altar' | 'fortune' | 'furnace' | 'stall' | 'bell';
+export type RitualKey = 'keeper' | 'incense' | 'altar' | 'fortune' | 'furnace' | 'stall' | 'bell' | 'lantern';
 
 const RITUALS: { k: RitualKey; vi: string; en: string; icon: string }[] = [
   { k: 'keeper', vi: 'Bà Thủ Từ', en: 'Keeper', icon: '🧓' },
@@ -13,6 +13,7 @@ const RITUALS: { k: RitualKey; vi: string; en: string; icon: string }[] = [
   { k: 'furnace', vi: 'Viết sớ', en: 'Petition', icon: '📜' },
   { k: 'stall', vi: 'Nhận lộc', en: 'Lộc', icon: '🧧' },
   { k: 'bell', vi: 'Chuông', en: 'Bell', icon: '🔔' },
+  { k: 'lantern', vi: 'Thả đèn', en: 'Lantern', icon: '🪷' },
 ];
 
 interface Props {
@@ -55,7 +56,7 @@ export const Dock: React.FC<Props> = ({ spots, time, onTime, auto, onAuto, tour,
         <kbd className="hidden pointer-fine:inline ml-1 px-1 rounded border border-[#d9c7a6] text-[10px] font-sans">H</kbd>
       </button>
       {open && (
-        <div className="pointer-events-auto -mt-2 w-[min(760px,calc(100vw-1.5rem))] rounded-2xl bg-[#fbf3e2]/95 backdrop-blur-md border border-[#d9c7a6] shadow-[0_10px_40px_rgba(42,20,16,0.35)] p-2 sm:p-2.5">
+        <div className="pointer-events-auto -mt-2 w-[min(940px,calc(100vw-1.5rem))] rounded-2xl bg-[#fbf3e2]/95 backdrop-blur-md border border-[#d9c7a6] shadow-[0_10px_40px_rgba(42,20,16,0.35)] p-2 sm:p-2.5">
           <div className="flex items-center gap-2">
             <div className="flex p-0.5 rounded-xl bg-[#efe3cb]" role="tablist">
               {(

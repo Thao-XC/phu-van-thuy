@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, BookOpen, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, BookOpen, Volume2, VolumeX, Settings as Gear, Keyboard } from 'lucide-react';
+import { Minimap, SettingsSheet, ControlsSheet, LanternSheet, loadSettings, saveSettings, type Settings } from './components/PcHud';
 import { TempleScene, type TimeOfDay } from './three/TempleScene';
 import type { SpotDef } from './three/world/types';
 import type { StoryCard } from './three/encounters/types';
@@ -18,7 +19,7 @@ import { useBackLayer } from './services/backStack';
 import { PALACES, type PalaceId } from './data/story';
 import type { LocKind } from './data/rituals';
 
-type Modal = 'keeper' | 'incense' | 'altar' | 'fortune' | 'furnace' | 'stall' | 'journal' | null;
+type Modal = 'keeper' | 'incense' | 'altar' | 'fortune' | 'furnace' | 'stall' | 'journal' | 'settings' | 'controls' | 'lantern' | null;
 
 const PROMPT: Record<string, string> = {
   gate: 'Vái before the gate',
@@ -29,6 +30,7 @@ const PROMPT: Record<string, string> = {
   furnace: 'Write & burn a petition',
   bell: 'Strike the great bell',
   stall: 'Receive lộc',
+  river: 'Float a lantern',
 };
 
 export default function App() {
@@ -46,10 +48,13 @@ export default function App() {
   const [tour, setTour] = useState(false);
   const [muted, setMuted] = useState(soundService.getMuted());
   const [spots, setSpots] = useState<SpotDef[]>([]);
+  const [settings, setSettings] = useState<Settings>(loadSettings);
+  const [locked, setLocked] = useState(false);
+  const isPc = typeof window !== 'undefined' && window.matchMedia?.('(pointer: fine)').matches;
   const mount = useRef<HTMLDivElement>(null);
   const scene = useRef<TempleScene | null>(null);
   // per-visit manners
-  const visit = useRef({ incense: false, prayed: false, petition: false, lucky: 0, hoardWarned: false });
+  const visit = useRef({ incense: false, prayed: false, petition: false, lucky: 0, hoardWarned: false, lantern: false });
 
   const showCaption = useCallback((t: string, s = 4) => {
     setCaption(t);
@@ -60,7 +65,7 @@ export default function App() {
   /* ---------------- the 3D temple ---------------- */
   useEffect(() => {
     if (view !== 'temple' || !mount.current) return;
-    visit.current = { incense: false, prayed: false, petition: false, lucky: 0, hoardWarned: false };
+    visit.current = { incense: false, prayed: false, petition: false, lucky: 0, hoardWarned: false, lantern: false };
     const s = new TempleScene(mount.current, {
       onNearSpot: (id, name, type) => setNear(id && name && type ? { id, name, type } : null),
       onCaption: (t, sec) => showCaption(t, sec),
@@ -97,6 +102,7 @@ export default function App() {
       },
     });
     s.setTimeOfDay(time);
+    s.onPointerLockChange = setLocked;
     scene.current = s;
     setSpots(s.spotList);
     soundService.startAmbient();
@@ -108,6 +114,28 @@ export default function App() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view]);
+
+  // apply settings to the scene
+  useEffect(() => {
+    const s = scene.current;
+    if (!s) return;
+    s.look.sensitivity = settings.sensitivity;
+    s.look.invertY = settings.invertY;
+    s.look.pointerLock = settings.pointerLock;
+    s.setFov(settings.fov);
+    s.setQuality(settings.quality);
+    saveSettings(settings);
+  }, [settings, view]);
+
+  // give the mouse back whenever a panel opens
+  useEffect(() => {
+    if (modal || card || showPhuc) scene.current?.releasePointer();
+  }, [modal, card, showPhuc]);
+
+  const getPlayer = useCallback(() => {
+    const s = scene.current;
+    return s && !s.inRealm ? { x: s.playerPosition.x, z: s.playerPosition.z, rotY: s.playerRotationY } : null;
+  }, []);
 
   // Back / Esc: leave a realm first, then the temple itself
   useBackLayer(view === 'temple', () => setView('landing'));
@@ -127,7 +155,8 @@ export default function App() {
   const openRitual = (k: RitualKey | string) => {
     if (k === 'gate') return scene.current?.bow();
     if (k === 'bell') return ringBell();
-    if (k === 'keeper' || k === 'incense' || k === 'altar' || k === 'fortune' || k === 'furnace' || k === 'stall') setModal(k);
+    if (k === 'river') return setModal('lantern');
+    if (k === 'keeper' || k === 'incense' || k === 'altar' || k === 'fortune' || k === 'furnace' || k === 'stall' || k === 'lantern') setModal(k as Modal);
   };
 
   // keyboard: E to interact
@@ -136,6 +165,9 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       if (document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement) return;
       if ((e.key === 'e' || e.key === 'E') && near && !modal && !inRealm) openRitual(near.type);
+      else if ((e.key === 'j' || e.key === 'J') && !modal) setModal('journal');
+      else if ((e.key === 'm' || e.key === 'M') && !modal) setSettings((st) => ({ ...st, minimap: !st.minimap }));
+      else if (e.key === '?' && !modal) setModal('controls');
       else if (e.key === '1') changeTime('day');
       else if (e.key === '2') changeTime('twilight');
       else if (e.key === '3') changeTime('night');
@@ -195,6 +227,12 @@ export default function App() {
           <span className="text-xs font-bold tabular-nums text-[#4a3826]">{story.khan.length}/4</span>
           <BookOpen className="w-4 h-4 text-[#8e1b1b] hidden sm:block" />
         </button>
+        <button onClick={() => setModal('controls')} className="hidden pointer-fine:flex p-2 rounded-xl bg-[#fbf3e2]/95 border border-[#d9c7a6] shadow-md cursor-pointer" aria-label="Controls" title="Controls (?)">
+          <Keyboard className="w-4 h-4 text-[#4a3826]" />
+        </button>
+        <button onClick={() => setModal('settings')} className="p-2 rounded-xl bg-[#fbf3e2]/95 border border-[#d9c7a6] shadow-md cursor-pointer" aria-label="Settings" title="Settings">
+          <Gear className="w-4 h-4 text-[#4a3826]" />
+        </button>
         <button
           onClick={() => {
             const m = !muted;
@@ -212,6 +250,20 @@ export default function App() {
       {!story.started && !modal && !inRealm && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-20 px-4 py-2 rounded-xl bg-[#2a1410]/80 text-[#fbeed2] text-[13px] shadow-lg backdrop-blur-sm text-center max-w-[92vw]">
           Walk through a side gate and find <b>Bà Thủ Từ</b>, the temple keeper, by the incense burner.
+        </div>
+      )}
+
+      {/* PC: minimap under the top bar, crosshair while the mouse is captured, key hints */}
+      {!inRealm && settings.minimap && spots.length > 0 && (
+        <div className="hidden lg:block fixed right-3 top-16 z-20">
+          <Minimap spots={spots} getPlayer={getPlayer} onGo={(id) => scene.current?.teleportToSpot(id)} near={near?.id} />
+        </div>
+      )}
+      {locked && <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-1.5 h-1.5 rounded-full bg-white/90 shadow-[0_0_0_2px_rgba(0,0,0,0.35)] pointer-events-none" aria-hidden />}
+      {isPc && !inRealm && !modal && (
+        <div className="hidden lg:flex fixed left-3 bottom-4 z-20 flex-col gap-1 px-3 py-2 rounded-xl bg-[#2a1410]/70 text-[#fbeed2] text-[12px] backdrop-blur-sm pointer-events-none">
+          <span>{locked ? 'Mouse captured · Esc to release' : 'Click the view to look around'}</span>
+          <span className="opacity-80">WASD walk · E use · B vái · J journal · M map · ? keys</span>
         </div>
       )}
 
@@ -310,6 +362,19 @@ export default function App() {
               visit.current.hoardWarned = true;
               luckService.change(-1, 'Lộc is meant to be shared, not hoarded');
             }
+          }}
+        />
+      )}
+      {modal === 'settings' && <SettingsSheet value={settings} onChange={setSettings} onClose={() => setModal(null)} />}
+      {modal === 'controls' && <ControlsSheet onClose={() => setModal(null)} />}
+      {modal === 'lantern' && (
+        <LanternSheet
+          night={time !== 'day'}
+          onClose={() => setModal(null)}
+          onRelease={(c) => {
+            scene.current?.floatLantern(c);
+            if (!visit.current.lantern) luckService.change(1, 'Set a lotus lantern on the river');
+            visit.current.lantern = true;
           }}
         />
       )}
