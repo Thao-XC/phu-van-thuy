@@ -18,7 +18,7 @@ const rot = <T extends THREE.Object3D>(o: T, x: number, y: number, z: number): T
 };
 
 /**
- * Phủ Vân Thủy, "the Cloud and Water Shrine": a fictional Mother Goddess temple
+ * Phủ Vân Thủy, "the Cloud and Water Temple": a fictional Mother Goddess temple
  * on a river bend under karst mountains in northern Vietnam.
  *
  * Layout (forward = -z):

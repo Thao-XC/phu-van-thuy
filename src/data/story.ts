@@ -71,7 +71,7 @@ export const PALACE = Object.fromEntries(PALACES.map((p) => [p.id, p])) as Recor
 /** What the keeper says at each point in the story */
 export const KEEPER = {
   intro: [
-    'Ah, a visitor at dusk. Welcome to Phủ Vân Thủy, the Cloud and Water Shrine.',
+    'Ah, a visitor at dusk. Welcome to Phủ Vân Thủy, the Cloud and Water Temple.',
     'Tonight we should hold a hầu đồng, a ceremony where a medium dances for the Mothers and the spirits of the Four Palaces.',
     'But this morning the four scarves the medium wears for each palace were gone: red for Heaven, green for the Mountains and Forests, white for the Waters, yellow for the Earth. The realms have taken them back.',
     'They will only return them to someone who asks with a sincere heart. Will you go? Light incense first, and walk calmly. The realms are watching how you behave.',

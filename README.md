@@ -30,7 +30,7 @@ invert Y, field of view, graphics quality, minimap.
 and a warmth meter; a golden shimmer appears when you're close. Two secrets only show themselves at night.
 
 **The legend film.** At the water-puppet pavilion (thủy đình) on the lotus pond, or from the landing page and the journal:
-a ~4-minute film in Đông Hồ woodblock style about the real history and legends of the Mother Goddesses, from the old
+a ~5-minute film drawn as Đông Hồ woodblock prints (colour blocks pressed one pigment at a time, printed title cards, camera moves, pentatonic score) about the real history and legends of the Mother Goddesses, from the old
 mother cults and Âu Cơ to Liễu Hạnh, hầu đồng and UNESCO's 2016 recognition. Narrated by the browser's synthesized
 voice in English or Vietnamese (where a Vietnamese voice is installed), with bilingual subtitles.
 

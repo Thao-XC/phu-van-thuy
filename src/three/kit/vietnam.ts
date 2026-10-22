@@ -478,7 +478,7 @@ export class VietKit {
     return g;
   }
 
-  /** Small grotto shrine for the Mountain Mother (Sơn trang) */
+  /** Small grotto altar for the Mountain Mother (Sơn trang) */
   grotto(): THREE.Group {
     const g = new THREE.Group();
     const rockM = this.v.karst;

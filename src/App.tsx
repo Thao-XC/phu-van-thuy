@@ -334,7 +334,7 @@ export default function App() {
       {loading && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#2a1410] text-[#fbeed2]" role="status">
           <span className="font-display font-bold text-4xl text-[#e9b84a] animate-pulse">Phủ Vân Thủy</span>
-          <span className="mt-2 font-display italic text-lg">The Cloud &amp; Water Shrine</span>
+          <span className="mt-2 font-display italic text-lg">The Cloud &amp; Water Temple</span>
           <span className="mt-1 text-[13px] opacity-70">The mist is lifting…</span>
         </div>
       )}

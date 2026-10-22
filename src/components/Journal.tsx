@@ -78,7 +78,7 @@ export const JournalSheet: React.FC<{ onClose: () => void; onOpenCard: (c: Story
           <span className="w-10 h-10 rounded-full bg-[#8e1b1b] flex items-center justify-center shrink-0">▶</span>
           <span>
             <span className="block text-sm font-semibold">The Mothers of the Four Palaces</span>
-            <span className="block text-xs opacity-80">A short narrated film: the real history and legends · ~4 min</span>
+            <span className="block text-xs opacity-80">A narrated Đông Hồ-style film: the real history and legends · ~5 min</span>
           </span>
         </button>
       )}

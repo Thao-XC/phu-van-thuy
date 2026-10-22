@@ -49,9 +49,9 @@ export const Landing: React.FC<{ onEnter: () => void; onWatch: () => void }> = (
       <Lantern x="90%" delay={2.1} s={1} />
 
       <main className="relative min-h-full flex flex-col items-center justify-center px-5 py-16 text-center">
-        <div className="text-[#e9b84a] text-xs sm:text-sm uppercase tracking-[0.35em] pl-[0.35em] font-semibold">Đền Mẫu · A Mother Goddess temple</div>
+        <div className="text-[#e9b84a] text-xs sm:text-sm uppercase tracking-[0.35em] pl-[0.35em] font-semibold">Phủ thờ Mẫu · A Mother Goddess temple</div>
         <h1 className="font-display font-bold text-5xl sm:text-7xl mt-2 text-[#fff4dc] drop-shadow-[0_2px_20px_rgba(233,184,74,0.35)]">Phủ Vân Thủy</h1>
-        <p className="mt-3 font-display italic text-lg sm:text-xl text-[#f2d9a8]">The Cloud & Water Shrine</p>
+        <p className="mt-3 font-display italic text-lg sm:text-xl text-[#f2d9a8]">The Cloud & Water Temple</p>
 
         <div className="mt-8 flex gap-3 sm:gap-4" aria-label="The four scarves">
           {PALACES.map((p) => (

@@ -116,7 +116,7 @@ export const FILM: FilmChapter[] = [
         vi: 'Mẫu là một trong Tứ bất tử của người Việt, cùng Tản Viên Sơn Thánh, Thánh Gióng và Chử Đồng Tử.',
       },
       {
-        en: 'Her greatest shrine is Phủ Dầy, in Nam Định. People say: in the eighth month, remember the Father; in the third month, remember the Mother.',
+        en: 'Her greatest temple is Phủ Dầy, in Nam Định. People say: in the eighth month, remember the Father; in the third month, remember the Mother.',
         vi: 'Nơi thờ chính của Mẫu là Phủ Dầy, Nam Định. Dân gian có câu: tháng Tám giỗ Cha, tháng Ba giỗ Mẹ.',
       },
     ],
