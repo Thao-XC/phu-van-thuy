@@ -1,0 +1,119 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Be Vietnam Pro', system-ui, sans-serif;
+  }
+}
+
+/* headings, in a serif with full Vietnamese diacritics */
+.font-display,
+.font-cinzel {
+  font-family: 'Noto Serif', 'Times New Roman', serif;
+}
+/* Hán characters on plaques and seals */
+.font-han,
+.font-kanji {
+  font-family: 'Noto Serif TC', 'Noto Serif', serif;
+}
+
+/* gentle drifting glow for the landing page */
+@keyframes drift {
+  0%, 100% { transform: translateY(0); opacity: .75; }
+  50% { transform: translateY(-14px); opacity: 1; }
+}
+.drift { animation: drift 6s ease-in-out infinite; }
+@keyframes burn {
+  0% { clip-path: inset(0 0 0 0); filter: none; }
+  30% { filter: sepia(1) brightness(.9); }
+  100% { clip-path: inset(0 0 100% 0); filter: sepia(1) brightness(.4); opacity: .2; }
+}
+.burn { animation: burn 2.6s ease-in forwards; }
+@keyframes coin-flip {
+  0% { transform: translateY(0) rotateX(0); }
+  50% { transform: translateY(-90px) rotateX(900deg); }
+  100% { transform: translateY(0) rotateX(1800deg); }
+}
+.coin-flip { animation: coin-flip 0.9s cubic-bezier(.3,.7,.4,1) both; }
+@keyframes shake-tube {
+  0%, 100% { transform: rotate(-8deg); }
+  50% { transform: rotate(8deg); }
+}
+.shake-tube { animation: shake-tube .16s ease-in-out infinite; transform-origin: 50% 90%; }
+@keyframes stick-out {
+  from { transform: translateY(0); }
+  to { transform: translateY(-46px) rotate(8deg); }
+}
+.stick-out { animation: stick-out .5s ease-out forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .drift, .coin-flip, .shake-tube, .stick-out { animation: none; }
+}
+
+/* Warm scrollbars to match the washi theme */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(142, 27, 27, 0.3);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(140, 120, 94, 0.55);
+}
+
+/* Sheet / dialog entrance: slides up on phones, settles in on PC */
+@keyframes sheet-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes sheet-pop {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.sheet-fade {
+  animation: sheet-fade 200ms ease-out;
+}
+.sheet-panel {
+  animation: sheet-up 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 200ms ease-out;
+}
+@media (min-width: 640px) {
+  .sheet-panel {
+    animation: sheet-pop 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet-fade,
+  .sheet-panel {
+    animation: none;
+  }
+}
+
+/* Omamori: a gentle swing from the cord, and a little hop when chosen */
+@keyframes omamori-swing {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(4deg); }
+}
+@keyframes omamori-hop {
+  0% { transform: translateY(0) scale(1); }
+  40% { transform: translateY(-6px) scale(1.06); }
+  100% { transform: translateY(0) scale(1); }
+}
+.omamori-swing {
+  transform-origin: 50% 4%;
+  animation: omamori-swing 3.2s ease-in-out infinite;
+}
+.omamori-hop {
+  animation: omamori-hop 0.35s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .omamori-swing, .omamori-hop { animation: none; }
+}
