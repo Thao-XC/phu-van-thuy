@@ -592,6 +592,9 @@ export class TempleScene {
   }
 
   private onKeyDown = (e: KeyboardEvent) => {
+    // typing in a text box (the keeper's chat, a petition) never moves or acts in the world
+    const tgt = e.target as HTMLElement | null;
+    if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.tagName === 'SELECT' || tgt.isContentEditable)) return;
     if (this.possession) {
       if (e.code === 'Escape') this.possession.skip();
       else if ((e.code === 'Space' || e.code === 'Enter') && !e.repeat) {
@@ -613,8 +616,7 @@ export class TempleScene {
       this.skipArrival();
       return;
     }
-    const t = e.target as HTMLElement | null;
-    if (!this._input || (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable))) return;
+    if (!this._input) return;
     if (e.code.startsWith('Arrow')) e.preventDefault();
     this.keysPressed[e.code] = true;
     if (e.code === 'KeyB' && !e.repeat) this.bow();
@@ -1609,6 +1611,7 @@ export class TempleScene {
       const f = this.scene.fog as THREE.FogExp2;
       f.color.copy(this.fogSave.c);
       f.density = this.fogSave.d;
+      this.fogSave = null;
     }
     const x = 1.6, z = -7.2;
     this.playerPosition.set(x, 1.7 + this.ground(x, z), z);

@@ -9,7 +9,9 @@ import { Dock, type RitualKey } from './components/Dock';
 import { KeeperSheet } from './components/Keeper';
 import { JournalSheet } from './components/Journal';
 import { Tracker } from './components/Trail';
-import { LegendFilm } from './components/LegendFilm';
+import { lazy, Suspense } from 'react';
+import { ErrorBoundary } from './components/ErrorBoundary';
+const LegendFilm = lazy(() => import('./components/LegendFilm').then((m) => ({ default: m.LegendFilm })));
 import { useCalendar, CalendarChip, FestivalSheet, festivalKey, isFestivalDone, markFestivalDone } from './components/Calendar';
 import { liveTimeOfDay, today, type Festival } from './services/lunar';
 import { SECRETS, nextSecret } from './data/story';
@@ -147,7 +149,8 @@ export default function App() {
         if (e.type === 'phase' && e.phase === 'done') {
           window.setTimeout(() => setPossessing(false), 3800);
           try {
-            localStorage.setItem('pvt_chosen', String(Number(localStorage.getItem('pvt_chosen') || 0) + 1));
+            const n = parseInt(localStorage.getItem('pvt_chosen') ?? '0', 10) || 0;
+            localStorage.setItem('pvt_chosen', String(n + 1));
           } catch {
             /* ignore */
           }
@@ -399,7 +402,8 @@ export default function App() {
     if (k === 'keeper' || k === 'furnace' || k === 'stall' || k === 'lantern') setModal(k as Modal);
   };
 
-  // keyboard: E to interact
+  // keyboard: E to interact. No dependency list on purpose: the handler reads a lot of current
+  // state (near, modal, rite…), so it is re-attached after every render rather than going stale.
   useEffect(() => {
     if (view !== 'temple') return;
     const onKey = (e: KeyboardEvent) => {
@@ -543,7 +547,13 @@ export default function App() {
           }}
           onWatch={() => setModal('film')}
         />
-        {modal === 'film' && <LegendFilm onClose={() => setModal(null)} />}
+        {modal === 'film' && (
+          <ErrorBoundary onReset={() => setModal(null)}>
+            <Suspense fallback={null}>
+              <LegendFilm onClose={() => setModal(null)} />
+            </Suspense>
+          </ErrorBoundary>
+        )}
       </>
     );
 
@@ -815,6 +825,11 @@ export default function App() {
       />
 
       {/* sheets */}
+      <ErrorBoundary key={modal ?? (card ? 'card' : 'none')} onReset={() => {
+        setModal(null);
+        setCard(null);
+        setShowPhuc(false);
+      }}>
       {modal === 'keeper' && (
         <KeeperSheet
           onClose={() => setModal(null)}
@@ -909,7 +924,13 @@ export default function App() {
           }}
         />
       )}
-      {modal === 'film' && <LegendFilm onClose={() => setModal(null)} />}
+      {modal === 'film' && (
+          <ErrorBoundary onReset={() => setModal(null)}>
+            <Suspense fallback={null}>
+              <LegendFilm onClose={() => setModal(null)} />
+            </Suspense>
+          </ErrorBoundary>
+        )}
       {modal === 'calendar' && <FestivalSheet onClose={() => setModal(null)} now={cal.now} lunar={cal.lunar} festival={cal.festival} onActivity={doFestival} schedule={sched} />}
       {modal === 'journal' && <JournalSheet onWatchFilm={() => setModal('film')} initial={journalTab} onClose={() => setModal(null)} onOpenCard={(c) => setCard({ card: c, luck: 0, firstTime: false })} />}
 
@@ -917,6 +938,7 @@ export default function App() {
       <CaptionBar text={caption} />
       {card && <StoryCardSheet card={card.card} luck={card.luck} firstTime={card.firstTime} onClose={() => setCard(null)} />}
       {showPhuc && <LuckSheet onClose={() => setShowPhuc(false)} />}
+      </ErrorBoundary>
     </div>
   );
 }

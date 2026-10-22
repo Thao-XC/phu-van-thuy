@@ -47,7 +47,9 @@ export const KeeperSheet: React.FC<{ onClose: () => void; onStart: () => void }>
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
-  useEffect(() => listRef.current?.scrollTo({ top: 1e6, behavior: 'smooth' }), [msgs]);
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: 1e6, behavior: 'smooth' });
+  }, [msgs]);
 
   const intro = !story.started;
   const missing = PALACES.filter((p) => !story.khan.includes(p.id));
@@ -65,7 +67,11 @@ export const KeeperSheet: React.FC<{ onClose: () => void; onStart: () => void }>
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: q, history: msgs.slice(-6), khan: story.khan }),
       });
-      if (r.ok) reply = (await r.json()).reply ?? '';
+      const type = r.headers.get('content-type') ?? '';
+      if (r.ok && type.includes('json')) {
+        const body = await r.json();
+        if (typeof body?.reply === 'string') reply = body.reply;
+      }
     } catch {
       /* offline */
     }

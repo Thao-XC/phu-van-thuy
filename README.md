@@ -81,7 +81,9 @@ bun run dev
 ```
 
 Optional: set `GEMINI_API_KEY` (see `.env.example`) so the temple keeper can answer free-form questions through
-`api/keeper.ts`. Without it she uses built-in answers.
+`api/keeper.ts`. Without it she uses built-in answers. On Vercel it runs as a serverless function; in `dev`, Vite
+serves the same handler at `/api/keeper` (export the key in your shell first, e.g. `GEMINI_API_KEY=… bun run dev`).
+The itch.io build has no server: point it at your Vercel deployment with `VITE_KEEPER_URL=https://…/api/keeper`.
 
 Phủ Vân Thủy is fictional, made with respect for Đạo Mẫu, whose rituals UNESCO recognised as Intangible Cultural Heritage in 2016.
 
