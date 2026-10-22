@@ -135,7 +135,7 @@ export const thoaiPhu = (p: Place): EncounterDef => ({
   diveColor: 0x1d5a66,
   card: {
     title: 'Thoải phủ: the Water Palace',
-    jp: 'Mẫu Thoải · 水府',
+    jp: 'Mẫu Thoải · Thủy phủ',
     body: [
       'Mẫu Thoải, the Mother of the Water Palace, rules rivers, lakes and the sea, and she always wears white. In many tellings she is a daughter of the Dragon King (Long Vương).',
       'In a land of rice paddies, deltas and floods, water gives life and takes it away. Fishermen, boatmen and families living along the Red River pray to her for calm water and safe journeys.',
@@ -270,7 +270,7 @@ export const thuongNgan = (p: Place): EncounterDef => ({
   diveColor: 0x0f2414,
   card: {
     title: 'Thượng Ngàn: the Mountain & Forest Palace',
-    jp: 'Mẫu Thượng Ngàn · 岳府',
+    jp: 'Mẫu Thượng Ngàn · Nhạc phủ',
     body: [
       'Mẫu Thượng Ngàn rules the mountains and forests, the animals and plants, and the peoples of the highlands. She wears green. Among her best-known temples are Đền Bắc Lệ in Lạng Sơn and Đền Suối Mỡ in Bắc Giang.',
       'The forest palace is full of spirits: the little Cô and Cậu who play in the woods, and Ông Hổ, Lord Tiger, the guardian of the mountains, who also crouches beneath temple altars.',
@@ -401,7 +401,7 @@ export const thienPhu = (p: Place): EncounterDef => ({
   diveColor: 0xfff1d6,
   card: {
     title: 'Thiên phủ: the Heaven Palace',
-    jp: 'Mẫu Liễu Hạnh · 天府',
+    jp: 'Mẫu Liễu Hạnh · Thiên phủ',
     body: [
       'The Heaven Palace is ruled by the Mother of the Upper Heavens, who wears red. She is often identified with Thánh Mẫu Liễu Hạnh, the most beloved goddess of Vietnamese folk belief.',
       'Legend says Liễu Hạnh was a daughter of the Jade Emperor. At a heavenly banquet she broke a precious jade cup, and was sent down to live among people. She chose to come back to earth again and again.',
@@ -443,7 +443,7 @@ export const thienPhu = (p: Place): EncounterDef => ({
     sea.position.y = -40;
     root.add(sea);
     // the red and gold palace of heaven
-    const pal = vk.mainHall({ w: 14, d: 9, name: '天府' });
+    const pal = vk.mainHall({ w: 14, d: 9, name: 'THIÊN PHỦ' });
     pal.traverse((c) => {
       const m = c as THREE.Mesh;
       if (m.isMesh && m.material === vk.v.ochre) m.material = vk.v.lacquer;
@@ -539,7 +539,7 @@ export const diaPhu = (p: Place): EncounterDef => ({
   diveColor: 0x2a1c08,
   card: {
     title: 'Địa phủ: the Earth Palace',
-    jp: 'Mẫu Địa · 地府',
+    jp: 'Mẫu Địa · Địa phủ',
     body: [
       'The Earth Palace belongs to Mẫu Địa, the Earth Mother, who wears yellow. She rules the land itself: soil and harvest, the fertility of fields and families.',
       'In the Mother Goddess religion the Earth Palace is not the underworld of Buddhist tales, but the living earth everyone stands on. She is the least often shown in statues of the four Mothers.',

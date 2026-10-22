@@ -212,13 +212,10 @@ export function createProceduralTextures(): ShrineTextureLibrary {
       ctx.fillRect(0, y, 256, 2);
     }
 
-    // Kanji seal in center
     ctx.fillStyle = '#111';
     ctx.font = 'bold 80px "Noto Serif JP", serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('奉', 128, 200);
-    ctx.fillText('納', 128, 300);
   });
 
   return {

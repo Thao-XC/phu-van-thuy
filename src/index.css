@@ -11,7 +11,7 @@
 .font-cinzel {
   font-family: 'Noto Serif', 'Times New Roman', serif;
 }
-/* Hán characters on plaques and seals */
+/* legacy class: plaques and seals */
 .font-han,
 .font-kanji {
   font-family: 'Noto Serif TC', 'Noto Serif', serif;
@@ -117,3 +117,5 @@
 @media (prefers-reduced-motion: reduce) {
   .omamori-swing, .omamori-hop { animation: none; }
 }
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }

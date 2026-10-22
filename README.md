@@ -1,4 +1,4 @@
-# Phủ Vân Thủy 雲水府
+# Phủ Vân Thủy
 
 A 3D, first-person visit to a fictional Vietnamese Mother Goddess temple (Đạo Mẫu, the Four Palaces).
 Works on phone and PC.
@@ -21,9 +21,20 @@ viết & hóa sớ (write and burn a petition), thỉnh bùa / nhận lộc (cha
 **Phúc.** Real temple etiquette counts: side gates and doors (the centre is for the gods), stepping over thresholds,
 walking calmly, odd-numbered incense, not hoarding lộc. Good manners and discoveries build phúc, which tilts the fortune sticks.
 
-**On PC.** Click the view to capture the mouse and look around freely (Esc releases it). WASD to walk, E to use,
-B to vái, J for the journal, M for the minimap, ? for all keys. Settings: mouse sensitivity, invert Y, field of view,
-graphics quality, minimap.
+**On PC.** ↑ ↓ walk, ← → turn (or WASD), Shift to hurry, PgUp/PgDn to look up and down. Click the view to capture
+the mouse and look around freely (Esc releases it). Click a golden marker to travel there; E or Enter uses what's in front
+of you. B to vái, J journal, T secret trail, F the legend film, M minimap, ? for all keys. Settings: mouse sensitivity,
+invert Y, field of view, graphics quality, minimap.
+
+**The secret trail.** Twelve secrets of the grounds wake one at a time. The tracker (top left) shows the current riddle
+and a warmth meter; a golden shimmer appears when you're close. Two secrets only show themselves at night.
+
+**The legend film.** At the water-puppet pavilion (thủy đình) on the lotus pond, or from the landing page and the journal:
+a ~4-minute film in Đông Hồ woodblock style about the real history and legends of the Mother Goddesses, from the old
+mother cults and Âu Cơ to Liễu Hạnh, hầu đồng and UNESCO's 2016 recognition. Narrated by the browser's synthesized
+voice in English or Vietnamese (where a Vietnamese voice is installed), with bilingual subtitles.
+
+**Language.** All signs, couplets and plaques are in Vietnamese (quốc ngữ), with English alongside in the interface.
 
 **Floating lanterns.** At the river landing you can set a lotus lantern (đèn hoa đăng) on the water with a wish,
 and watch it drift away. Lovelier at night.

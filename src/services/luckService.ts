@@ -1,5 +1,5 @@
 /**
- * Phúc (福): blessing points.
+ * Phúc: blessing points.
  * Good manners and discoveries raise phúc; ignoring real temple etiquette lowers it.
  * Phúc tilts the fortune sticks. Saved in this browser only.
  */

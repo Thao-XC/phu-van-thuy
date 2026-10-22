@@ -36,8 +36,8 @@ const Coin: React.FC<{ up: boolean; spin: number; delay?: number }> = ({ up, spi
       <circle cx="20" cy="20" r="18" fill={up ? '#e0b23a' : '#9a7a2a'} stroke="#6b4500" strokeWidth="2" />
       <rect x="15" y="15" width="10" height="10" fill="#fbf3e2" stroke="#6b4500" strokeWidth="1.4" />
       {up && (
-        <text x="20" y="11" textAnchor="middle" fontSize="6" fontWeight="700" fill="#6b4500" fontFamily="'Noto Serif TC', serif">
-          通寶
+        <text x="20" y="11" textAnchor="middle" fontSize="4.5" fontWeight="700" fill="#6b4500" fontFamily="'Noto Serif', serif">
+          LỘC
         </text>
       )}
     </svg>
@@ -345,8 +345,8 @@ export const XamModal: React.FC<{ onClose: () => void; phuc: number; onDrawn: (n
           <rect x="20" y="40" width="40" height="92" rx="6" fill="#7a5a2a" stroke="#4a3418" strokeWidth="2" />
           <rect x="20" y="56" width="40" height="5" fill="#c99212" />
           <rect x="20" y="112" width="40" height="5" fill="#c99212" />
-          <text x="40" y="92" textAnchor="middle" fontSize="13" fontWeight="700" fill="#fbe7b0" fontFamily="'Noto Serif TC', serif">
-            籤
+          <text x="40" y="92" textAnchor="middle" fontSize="9" fontWeight="700" fill="#fbe7b0" fontFamily="'Noto Serif', serif">
+            XĂM
           </text>
           {(step === 'stick' || step === 'confirm') && (
             <g className="stick-out">

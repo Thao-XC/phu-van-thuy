@@ -8,6 +8,9 @@ import { Landing } from './components/Landing';
 import { Dock, type RitualKey } from './components/Dock';
 import { KeeperSheet } from './components/Keeper';
 import { JournalSheet } from './components/Journal';
+import { Tracker } from './components/Trail';
+import { LegendFilm } from './components/LegendFilm';
+import { SECRETS, nextSecret } from './data/story';
 import { IncenseModal, AltarModal, XamModal, PetitionModal, StallModal } from './components/Rituals';
 import { KhanArt } from './components/LocArt';
 import { LuckChip, LuckToasts, CaptionBar, StoryCardSheet, LuckSheet } from './components/LuckAndLegends';
@@ -19,7 +22,7 @@ import { useBackLayer } from './services/backStack';
 import { PALACES, type PalaceId } from './data/story';
 import type { LocKind } from './data/rituals';
 
-type Modal = 'keeper' | 'incense' | 'altar' | 'fortune' | 'furnace' | 'stall' | 'journal' | 'settings' | 'controls' | 'lantern' | null;
+type Modal = 'keeper' | 'incense' | 'altar' | 'fortune' | 'furnace' | 'stall' | 'journal' | 'settings' | 'controls' | 'lantern' | 'film' | null;
 
 const PROMPT: Record<string, string> = {
   gate: 'Vái before the gate',
@@ -31,6 +34,7 @@ const PROMPT: Record<string, string> = {
   bell: 'Strike the great bell',
   stall: 'Receive lộc',
   river: 'Float a lantern',
+  theatre: 'Watch the legend of the Mothers',
 };
 
 export default function App() {
@@ -50,9 +54,21 @@ export default function App() {
   const [spots, setSpots] = useState<SpotDef[]>([]);
   const [settings, setSettings] = useState<Settings>(loadSettings);
   const [locked, setLocked] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [journalTab, setJournalTab] = useState<'story' | 'found' | 'trail' | 'pouch'>('story');
+  const [tips, setTips] = useState(() => {
+    try {
+      return localStorage.getItem('pvt_tips') !== '1';
+    } catch {
+      return true;
+    }
+  });
+  const [unlocked, setUnlocked] = useState(false);
+  const [aim, setAim] = useState<string | null>(null);
   const isPc = typeof window !== 'undefined' && window.matchMedia?.('(pointer: fine)').matches;
   const mount = useRef<HTMLDivElement>(null);
   const scene = useRef<TempleScene | null>(null);
+  const spotClick = useRef<(id: string) => void>(() => {});
   // per-visit manners
   const visit = useRef({ incense: false, prayed: false, petition: false, lucky: 0, hoardWarned: false, lantern: false });
 
@@ -75,7 +91,13 @@ export default function App() {
         if (first) luckService.change(luck, `Discovered: ${c.title}`);
         storyService.saveCard(id, c);
         setCard({ card: c, luck, firstTime: first });
+        const found = luckService.get().found;
+        scene.current?.setActiveSecret(nextSecret(found)?.id ?? null, found);
+        if (first && SECRETS.some((x) => x.id === id)) setUnlocked(true);
       },
+      onReady: () => setLoading(false),
+      onSpotClick: (id) => spotClick.current(id),
+      onAim: setAim,
       canEnter: () => (storyService.get().started ? true : 'Something holds you back. Perhaps speak with the temple keeper first, by the incense burner.'),
       onEncounter: (e) => {
         if (e.type === 'start') {
@@ -101,12 +123,19 @@ export default function App() {
         }
       },
     });
+    const veil = window.setTimeout(() => setLoading(false), 9000); // never trap anyone behind the veil
     s.setTimeOfDay(time);
     s.onPointerLockChange = setLocked;
+    {
+      const found = luckService.get().found;
+      s.setActiveSecret(nextSecret(found)?.id ?? null, found);
+    }
     scene.current = s;
     setSpots(s.spotList);
     soundService.startAmbient();
     return () => {
+      clearTimeout(veil);
+      setLoading(true);
       soundService.stopAmbient();
       soundService.stopChauVan();
       s.dispose();
@@ -127,16 +156,49 @@ export default function App() {
     saveSettings(settings);
   }, [settings, view]);
 
-  // give the mouse back whenever a panel opens
+  // give the mouse back whenever a panel opens, and stand still while it's open
   useEffect(() => {
-    if (modal || card || showPhuc) scene.current?.releasePointer();
-  }, [modal, card, showPhuc]);
+    const busy = !!(modal || card || showPhuc || tips);
+    if (busy) scene.current?.releasePointer();
+    if (scene.current) scene.current.inputEnabled = !busy;
+  }, [modal, card, showPhuc, tips, loading]);
+
+  useEffect(() => {
+    if (!unlocked || card || modal) return;
+    const t = window.setTimeout(() => setUnlocked(false), 4200);
+    return () => clearTimeout(t);
+  }, [unlocked, card, modal]);
+  const getSecretDistance = useCallback(() => scene.current?.activeSecretDistance ?? null, []);
+  const openJournal = (t: typeof journalTab = 'story') => {
+    setJournalTab(t);
+    setModal('journal');
+  };
+  const closeTips = () => {
+    setTips(false);
+    try {
+      localStorage.setItem('pvt_tips', '1');
+    } catch {
+      /* ignore */
+    }
+  };
 
   const getPlayer = useCallback(() => {
     const s = scene.current;
     return s && !s.inRealm ? { x: s.playerPosition.x, z: s.playerPosition.z, rotY: s.playerRotationY } : null;
   }, []);
 
+  useBackLayer(view === 'temple' && tips && !loading, () => closeTips());
+  useEffect(() => {
+    if (!tips || loading || view !== 'temple') return;
+    const k = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        closeTips();
+      }
+    };
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  });
   // Back / Esc: leave a realm first, then the temple itself
   useBackLayer(view === 'temple', () => setView('landing'));
   useBackLayer(inRealm, () => scene.current?.leaveLegend());
@@ -156,6 +218,7 @@ export default function App() {
     if (k === 'gate') return scene.current?.bow();
     if (k === 'bell') return ringBell();
     if (k === 'river') return setModal('lantern');
+    if (k === 'theatre') return setModal('film');
     if (k === 'keeper' || k === 'incense' || k === 'altar' || k === 'fortune' || k === 'furnace' || k === 'stall' || k === 'lantern') setModal(k as Modal);
   };
 
@@ -164,8 +227,10 @@ export default function App() {
     if (view !== 'temple') return;
     const onKey = (e: KeyboardEvent) => {
       if (document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement) return;
-      if ((e.key === 'e' || e.key === 'E') && near && !modal && !inRealm) openRitual(near.type);
-      else if ((e.key === 'j' || e.key === 'J') && !modal) setModal('journal');
+      if ((e.key === 'e' || e.key === 'E' || e.key === 'Enter') && near && !modal && !card && !inRealm) openRitual(near.type);
+      else if ((e.key === 'f' || e.key === 'F') && !modal && !card && !inRealm) setModal('film');
+      else if ((e.key === 'j' || e.key === 'J') && !modal) openJournal();
+      else if ((e.key === 't' || e.key === 'T') && !modal) openJournal('trail');
       else if ((e.key === 'm' || e.key === 'M') && !modal) setSettings((st) => ({ ...st, minimap: !st.minimap }));
       else if (e.key === '?' && !modal) setModal('controls');
       else if (e.key === '1') changeTime('day');
@@ -176,6 +241,15 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   });
 
+  // clicking a golden marker: use it if you're there, otherwise travel to it first
+  spotClick.current = (id: string) => {
+    if (modal || card || inRealm) return;
+    const spot = spots.find((x) => x.id === id);
+    if (!spot) return;
+    if (near?.id === id) return openRitual(spot.type);
+    scene.current?.travelToSpot(id, () => spot.type !== 'view' && spot.type !== 'gate' && window.setTimeout(() => openRitual(spot.type), 450));
+  };
+
   const changeTime = (t: TimeOfDay) => {
     setTime(t);
     scene.current?.setTimeOfDay(t);
@@ -185,12 +259,16 @@ export default function App() {
 
   if (view === 'landing')
     return (
-      <Landing
-        onEnter={() => {
-          soundService.playGreatBell();
-          setView('temple');
-        }}
-      />
+      <>
+        <Landing
+          onEnter={() => {
+            soundService.playGreatBell();
+            setView('temple');
+          }}
+          onWatch={() => setModal('film')}
+        />
+        {modal === 'film' && <LegendFilm onClose={() => setModal(null)} />}
+      </>
     );
 
   return (
@@ -210,7 +288,6 @@ export default function App() {
           <kbd className="hidden pointer-fine:inline ml-1 px-1 rounded border border-[#d9c7a6] text-[10px] text-[#6d5b49] font-sans">Esc</kbd>
         </button>
         <div className="hidden min-[520px]:flex items-center gap-2 px-3 py-2 rounded-xl bg-[#fbf3e2]/95 border border-[#d9c7a6] shadow-md text-xs">
-          <span className="font-han text-[#8e1b1b] font-bold">雲水府</span>
           <span className="text-[#4a3826] font-semibold">Phủ Vân Thủy</span>
         </div>
       </div>
@@ -218,7 +295,7 @@ export default function App() {
       {/* top-right: phúc, scarves, journal, sound */}
       <div className="fixed top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-30 flex items-center gap-1.5 sm:gap-2">
         <LuckChip onClick={() => setShowPhuc(true)} compact />
-        <button onClick={() => setModal('journal')} className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-xl bg-[#fbf3e2]/95 border border-[#d9c7a6] shadow-md cursor-pointer hover:border-[#8e1b1b]" aria-label={`Journal: ${story.khan.length} of 4 scarves`}>
+        <button onClick={() => openJournal()} className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-xl bg-[#fbf3e2]/95 border border-[#d9c7a6] shadow-md cursor-pointer hover:border-[#8e1b1b]" aria-label={`Journal: ${story.khan.length} of 4 scarves`}>
           <span className="flex -space-x-2.5">
             {PALACES.map((p) => (
               <KhanArt key={p.id} color={p.color} size={24} dim={!story.khan.includes(p.id)} />
@@ -246,10 +323,57 @@ export default function App() {
         </button>
       </div>
 
-      {/* first-time nudge */}
-      {!story.started && !modal && !inRealm && (
-        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-20 px-4 py-2 rounded-xl bg-[#2a1410]/80 text-[#fbeed2] text-[13px] shadow-lg backdrop-blur-sm text-center max-w-[92vw]">
-          Walk through a side gate and find <b>Bà Thủ Từ</b>, the temple keeper, by the incense burner.
+      {/* objective tracker: story goal + the current secret's riddle */}
+      {!inRealm && !loading && (
+        <div className={`fixed left-3 top-[calc(max(0.75rem,env(safe-area-inset-top))+3rem)] z-20 ${modal ? 'hidden sm:block' : ''}`}>
+          <Tracker getDistance={getSecretDistance} isNight={time === 'night'} onOpenTrail={() => openJournal('trail')} />
+        </div>
+      )}
+
+      {/* loading veil until the first frame is drawn */}
+      {loading && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#2a1410] text-[#fbeed2]" role="status">
+          <span className="font-display font-bold text-4xl text-[#e9b84a] animate-pulse">Phủ Vân Thủy</span>
+          <span className="mt-2 font-display italic text-lg">The Cloud &amp; Water Shrine</span>
+          <span className="mt-1 text-[13px] opacity-70">The mist is lifting…</span>
+        </div>
+      )}
+
+      {/* first visit: how to move */}
+      {tips && !loading && !inRealm && !modal && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-[#2a1410]/55 backdrop-blur-[2px] p-4" onClick={closeTips}>
+          <div className="w-[min(420px,100%)] rounded-3xl bg-[#fbf3e2] border border-[#d9c7a6] shadow-2xl p-5 text-[#2a1d14]" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="How to explore">
+            <div className="text-xs uppercase tracking-[0.18em] text-[#8e1b1b] font-semibold text-center">Chào mừng</div>
+            <h2 className="mt-1 text-xl font-display font-bold text-center">How to explore</h2>
+            <ul className="mt-4 space-y-2.5 text-[14px]">
+              {isPc ? (
+                <>
+                  <li className="flex gap-3"><span className="w-16 shrink-0 font-semibold text-[#8e1b1b]">↑ ↓ ← →</span>Walk and turn (or WASD). Hold Shift to hurry.</li>
+                  <li className="flex gap-3"><span className="w-16 shrink-0 font-semibold text-[#8e1b1b]">Mouse</span>Click the view, then move to look around. Esc frees the mouse.</li>
+                  <li className="flex gap-3"><span className="w-16 shrink-0 font-semibold text-[#8e1b1b]">Click</span>A golden marker to go there. E or Enter uses what's in front of you.</li>
+                  <li className="flex gap-3"><span className="w-16 shrink-0 font-semibold text-[#8e1b1b]">J · T · F</span>Journal · secret trail · the legend film. <span className="text-[#6d5b49]">? shows every key.</span></li>
+                </>
+              ) : (
+                <>
+                  <li className="flex gap-3"><span className="w-16 shrink-0 font-semibold text-[#8e1b1b]">Left</span>Drag the joystick to walk.</li>
+                  <li className="flex gap-3"><span className="w-16 shrink-0 font-semibold text-[#8e1b1b]">Right</span>Drag anywhere to look around.</li>
+                  <li className="flex gap-3"><span className="w-16 shrink-0 font-semibold text-[#8e1b1b]">Tap</span>The red button that appears near places to use them.</li>
+                </>
+              )}
+              <li className="flex gap-3"><span className="w-16 shrink-0 font-semibold text-[#8e1b1b]">✦</span>Secrets wake one at a time. Follow the riddle in the top-left card; a golden shimmer shows when you're close.</li>
+            </ul>
+            <button onClick={closeTips} className="mt-5 w-full py-2.5 rounded-2xl bg-gradient-to-r from-[#8e1b1b] to-[#b4301f] text-[#fff4dc] font-semibold cursor-pointer">
+              Step inside
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* a new riddle wakes after each secret card is closed */}
+      {unlocked && !card && !modal && !inRealm && (
+        <div className="fixed top-1/3 left-1/2 -translate-x-1/2 z-30 px-5 py-3 rounded-2xl bg-[#2a1410]/85 text-[#fbeed2] text-center shadow-2xl backdrop-blur-sm animate-[fadeUp_0.5s_ease-out] pointer-events-none">
+          <div className="text-[11px] uppercase tracking-[0.2em] text-[#e9b84a] font-semibold">✦ {nextSecret(luckService.get().found) ? 'A new riddle wakes' : 'The trail is complete'}</div>
+          <div className="mt-1 text-sm font-display italic max-w-[80vw]">{nextSecret(luckService.get().found)?.riddle ?? 'Every secret of the grounds is yours.'}</div>
         </div>
       )}
 
@@ -259,11 +383,16 @@ export default function App() {
           <Minimap spots={spots} getPlayer={getPlayer} onGo={(id) => scene.current?.teleportToSpot(id)} near={near?.id} />
         </div>
       )}
-      {locked && <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-1.5 h-1.5 rounded-full bg-white/90 shadow-[0_0_0_2px_rgba(0,0,0,0.35)] pointer-events-none" aria-hidden />}
+      {locked && <div className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 rounded-full pointer-events-none transition-all ${aim ? 'w-4 h-4 border-2 border-[#f2c14e] bg-[#f2c14e]/30' : 'w-1.5 h-1.5 bg-white/90 shadow-[0_0_0_2px_rgba(0,0,0,0.35)]'}`} aria-hidden />}
+      {locked && aim && (
+        <div className="fixed left-1/2 top-[calc(50%+1.4rem)] -translate-x-1/2 z-20 px-3 py-1 rounded-lg bg-[#2a1410]/80 text-[#fbeed2] text-[12px] font-semibold pointer-events-none whitespace-nowrap">
+          Click: go to {spots.find((x) => x.id === aim)?.vi}
+        </div>
+      )}
       {isPc && !inRealm && !modal && (
         <div className="hidden lg:flex fixed left-3 bottom-4 z-20 flex-col gap-1 px-3 py-2 rounded-xl bg-[#2a1410]/70 text-[#fbeed2] text-[12px] backdrop-blur-sm pointer-events-none">
           <span>{locked ? 'Mouse captured · Esc to release' : 'Click the view to look around'}</span>
-          <span className="opacity-80">WASD walk · E use · B vái · J journal · M map · ? keys</span>
+          <span className="opacity-80">↑↓←→ move · E use · F film · ? all keys</span>
         </div>
       )}
 
@@ -284,7 +413,7 @@ export default function App() {
             setTour(t);
             if (scene.current) scene.current.isCinematicMode = t;
           }}
-          onTeleport={(id) => scene.current?.teleportToSpot(id)}
+          onTeleport={(id) => scene.current?.travelToSpot(id)}
           onRitual={openRitual}
           onBow={() => scene.current?.bow()}
         >
@@ -378,7 +507,8 @@ export default function App() {
           }}
         />
       )}
-      {modal === 'journal' && <JournalSheet onClose={() => setModal(null)} onOpenCard={(c) => setCard({ card: c, luck: 0, firstTime: false })} />}
+      {modal === 'film' && <LegendFilm onClose={() => setModal(null)} />}
+      {modal === 'journal' && <JournalSheet onWatchFilm={() => setModal('film')} initial={journalTab} onClose={() => setModal(null)} onOpenCard={(c) => setCard({ card: c, luck: 0, firstTime: false })} />}
 
       <LuckToasts />
       <CaptionBar text={caption} />

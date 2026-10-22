@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { KhanArt } from './LocArt';
 import { PALACES } from '../data/story';
 import { useStory, storyService } from '../services/storyService';
@@ -25,7 +25,15 @@ const Lantern: React.FC<{ x: string; delay: number; s?: number }> = ({ x, delay,
   </div>
 );
 
-export const Landing: React.FC<{ onEnter: () => void }> = ({ onEnter }) => {
+export const Landing: React.FC<{ onEnter: () => void; onWatch: () => void }> = ({ onEnter, onWatch }) => {
+  // keyboard: Enter goes in
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && !document.querySelector('[role=dialog]') && document.activeElement === document.body) onEnter();
+    };
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  }, [onEnter]);
   const story = useStory();
   const begun = story.started || story.khan.length > 0;
   return (
@@ -41,7 +49,7 @@ export const Landing: React.FC<{ onEnter: () => void }> = ({ onEnter }) => {
       <Lantern x="90%" delay={2.1} s={1} />
 
       <main className="relative min-h-full flex flex-col items-center justify-center px-5 py-16 text-center">
-        <div className="font-han text-[#e9b84a] text-lg sm:text-xl tracking-[0.4em] pl-[0.4em]">雲水府</div>
+        <div className="text-[#e9b84a] text-xs sm:text-sm uppercase tracking-[0.35em] pl-[0.35em] font-semibold">Đền Mẫu · A Mother Goddess temple</div>
         <h1 className="font-display font-bold text-5xl sm:text-7xl mt-2 text-[#fff4dc] drop-shadow-[0_2px_20px_rgba(233,184,74,0.35)]">Phủ Vân Thủy</h1>
         <p className="mt-3 font-display italic text-lg sm:text-xl text-[#f2d9a8]">The Cloud & Water Shrine</p>
 
@@ -62,6 +70,11 @@ export const Landing: React.FC<{ onEnter: () => void }> = ({ onEnter }) => {
         <div className="mt-8 flex flex-col sm:flex-row gap-3 items-center">
           <button onClick={onEnter} className="px-8 py-3.5 rounded-2xl bg-[#c99212] hover:bg-[#dba51e] text-[#2a1410] font-bold text-base shadow-[0_8px_30px_rgba(201,146,18,0.35)] cursor-pointer transition-colors">
             {begun ? `Continue · ${story.khan.length} of 4 scarves` : 'Enter the temple'}
+            <kbd className="hidden pointer-fine:inline ml-2 px-1.5 rounded border border-[#2a1410]/30 text-[11px] font-sans font-semibold">Enter</kbd>
+          </button>
+          <button onClick={onWatch} className="flex items-center gap-2 px-5 py-3 rounded-2xl border border-[#e9b84a]/60 text-[#fbeed2] hover:bg-white/10 font-semibold cursor-pointer">
+            <span className="w-6 h-6 rounded-full bg-[#8e1b1b] flex items-center justify-center text-[11px]">▶</span>
+            Watch the legend of the Mothers
           </button>
           {begun && (
             <button
@@ -81,7 +94,7 @@ export const Landing: React.FC<{ onEnter: () => void }> = ({ onEnter }) => {
         <div className="mt-10 grid sm:grid-cols-3 gap-3 max-w-3xl w-full text-left text-[13px]">
           <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
             <div className="font-semibold text-[#f2c14e]">Move</div>
-            <p className="text-[#e8d6b4] mt-0.5">Phone: joystick bottom-left, drag to look. PC: WASD or arrows, drag to look, Shift to hurry (not in the temple!).</p>
+            <p className="text-[#e8d6b4] mt-0.5">↑ ↓ walk, ← → turn, click the view to look with the mouse, click golden markers to travel. Shift hurries (not in the temple!). Phones get a joystick.</p>
           </div>
           <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
             <div className="font-semibold text-[#f2c14e]">Mind your manners</div>

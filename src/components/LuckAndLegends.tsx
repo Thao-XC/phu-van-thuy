@@ -33,7 +33,7 @@ export const LuckChip: React.FC<{ onClick: () => void; compact?: boolean }> = ({
         pulse === 'up' ? 'border-[#15803d] scale-105' : pulse === 'down' ? 'border-[#b91c1c] scale-95' : 'border-[#d8cabb]'
       }`}
     >
-      <span className="font-han text-[#8e1b1b] text-sm leading-none">福</span>
+      <span className="font-display font-bold text-[#8e1b1b] text-[12px] leading-none">Phúc</span>
       <span className="tabular-nums text-[#2a1d14]">{value}</span>
       {!compact && <span className="hidden md:inline text-[11px] text-[#6d5b49] font-normal">{label.en}</span>}
     </button>
@@ -105,7 +105,7 @@ export const StoryCardSheet: React.FC<{ card: StoryCard; luck: number; firstTime
           Discovery · {found.length} of {TOTAL_SECRETS}
         </div>
         <h2 className="mt-3 text-xl sm:text-2xl font-display font-bold text-[#2c241c]">{card.title}</h2>
-        <div className="font-han text-[#8e1b1b] text-sm mt-0.5">{card.jp}</div>
+        <div className="font-display italic text-[#8e1b1b] text-sm mt-0.5">{card.jp}</div>
       </div>
       <p className="mt-4 text-sm italic text-[#5a4837] text-center font-display">{card.ending}</p>
       <div className="mt-4 space-y-3 text-[14px] leading-relaxed text-[#2c241c]">
@@ -138,7 +138,7 @@ export const LuckSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     <Sheet onClose={onClose} size="md" label="Phúc" className="px-5 sm:px-7 pt-4 sm:pt-7">
       <div className="flex items-center gap-4 pr-8">
         <div className="w-16 h-16 rounded-2xl bg-[#fbeedd] border border-[#d6b98c] flex flex-col items-center justify-center shrink-0">
-          <span className="font-han text-[#8e1b1b] text-xl leading-none">福</span>
+          <span className="font-display font-bold text-[#8e1b1b] text-base leading-none">Phúc</span>
           <span className="font-bold tabular-nums text-[#2c241c]">{value}</span>
         </div>
         <div>
@@ -152,7 +152,7 @@ export const LuckSheet: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         <div className="h-full rounded-full bg-gradient-to-r from-[#c99212] to-[#8e1b1b] transition-all" style={{ width: `${value}%` }} />
       </div>
       <p className="mt-3 text-[13px] text-[#4a3c2e]">
-        Phúc (福) means blessings, the good you build up by how you live. Here it tilts the fortune sticks: the more phúc, the better your odds.
+        Phúc means blessings, the good you build up by how you live. Here it tilts the fortune sticks: the more phúc, the better your odds.
       </p>
 
       <div className="mt-5 grid sm:grid-cols-2 gap-3 text-[13px]">

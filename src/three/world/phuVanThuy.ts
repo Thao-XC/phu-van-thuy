@@ -18,7 +18,7 @@ const rot = <T extends THREE.Object3D>(o: T, x: number, y: number, z: number): T
 };
 
 /**
- * Phủ Vân Thủy (雲水府), "the Cloud and Water Shrine": a fictional Mother Goddess temple
+ * Phủ Vân Thủy, "the Cloud and Water Shrine": a fictional Mother Goddess temple
  * on a river bend under karst mountains in northern Vietnam.
  *
  * Layout (forward = -z):
@@ -91,7 +91,7 @@ export const phuVanThuy: Layout = (ctx) => {
   ctx.scene.add(yard);
 
   /* ---------------- gate and enclosure ---------------- */
-  const gate = vk.tamQuan('雲水府');
+  const gate = vk.tamQuan('PHỦ VÂN THỦY');
   ctx.add(gate, 0, GATE_Z);
   // enclosure walls with little tiled caps
   const wall = (x0: number, z0: number, x1: number, z1: number) => {
@@ -184,12 +184,32 @@ export const phuVanThuy: Layout = (ctx) => {
       }),
   });
 
+  // secrets of the grounds: the well, a paper horse, a betel vine on an areca palm, a kapok by the river
+  ctx.add(vk.well(), 22, 16.4);
+  ctx.add(vk.paperHorse(), 17.4, 10.6, -0.3);
+  ctx.add(vk.betelVine(4.2, 0.24), 28, 30);
+  ctx.add(vk.kapok(1), -27, 56.5);
+
+  // water-puppet pavilion on the lotus pond: the legend of the Mothers is told here
+  const thuyDinh = vk.thuyDinh();
+  thuyDinh.position.set(-18.6, 0, 53.6);
+  thuyDinh.rotation.y = Math.PI / 2;
+  ctx.scene.add(thuyDinh);
+  const puppets = thuyDinh.userData.puppets as THREE.Group;
+  nat.animated.push({
+    update: (t) =>
+      puppets.children.forEach((c, i) => {
+        c.position.y = Math.sin(t * 1.6 + i * 1.3) * 0.06;
+        c.rotation.y = Math.sin(t * 0.7 + i) * 0.35;
+      }),
+  });
+
   // turtle stele outside the gate
-  const stele = vk.turtleStele('雲水府碑記');
+  const stele = vk.turtleStele('Bia ký Phủ Vân Thủy');
   ctx.add(stele, 12, 52, -0.3);
 
   /* ---------------- main hall ---------------- */
-  const hall = vk.mainHall({ w: HALL.w, d: HALL.d, name: '雲水府' });
+  const hall = vk.mainHall({ w: HALL.w, d: HALL.d, name: 'MẪU NGHI THIÊN HẠ' });
   ctx.add(hall, HALL.x, HALL.z);
   const altar = vk.altar();
   ctx.add(altar, 0, HALL.z - HALL.d / 2 + 2.4, 0, FLOOR_Y);
@@ -289,6 +309,7 @@ export const phuVanThuy: Layout = (ctx) => {
     { id: 'fortune', type: 'fortune', name: 'Fortune sticks', vi: 'Xin xăm', at: [6.8, -9], look: [8.8, -9], r: 2.4 },
     { id: 'bell', type: 'bell', name: 'Bell tower', vi: 'Gác chuông', at: [18, -8], look: [BELL.x, BELL.z] },
     { id: 'river', type: 'river', name: 'Lantern landing', vi: 'Bến thả đèn', at: [0, 63], look: [0, 74], r: 3.4 },
+    { id: 'theatre', type: 'theatre', name: 'Water-puppet pavilion', vi: 'Thủy đình', at: [-7, 54.6], look: [-18.6, 53.6], r: 3.4 },
     { id: 'pond', type: 'view', name: 'Half-moon lotus pond', vi: 'Hồ bán nguyệt', at: [-5, 47], look: [POND.x, POND.z] },
     { id: 'banyan', type: 'view', name: 'The old banyan', vi: 'Cây đa', at: [-8, 26], look: [BANYAN.x, BANYAN.z] },
     { id: 'grotto', type: 'view', name: 'Mountain grotto', vi: 'Sơn trang', at: [-18, -12], look: [GROTTO.x, GROTTO.z] },
@@ -329,6 +350,9 @@ export const phuVanThuy: Layout = (ctx) => {
       if (z < -22) return false;
       if (Math.abs(x - 10) < 1.8 && Math.abs(z - 32) < 1.1) return false; // stall
       if (Math.abs(x - 12) < 1.4 && Math.abs(z - 52) < 1.9) return false; // stele
+      if (Math.hypot(x - 22, z - 16.4) < 1.3) return false; // well
+      if (Math.abs(x - 17.4) < 1.0 && Math.abs(z - 10.6) < 0.6) return false; // paper horse
+      if (Math.hypot(x + 27, z - 56.5) < 1.8) return false; // kapok
       return true;
     },
     encounters: [

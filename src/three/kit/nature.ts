@@ -359,7 +359,7 @@ export class Nature {
     const g = new THREE.Group();
     const n = Math.floor(len / 4.2);
     const awnings = [0xc8261b, 0x2c4a7a, 0xd4a017, 0x3c6e47, 0xc8261b, 0x7a3b6d];
-    const signs = ['人形焼', '雷おこし', '扇子', '団子', '煎餅', '手拭', '土産', '甘味'];
+    const signs = ['Hương', 'Nến', 'Hoa', 'Quả', 'Vàng mã', 'Trà', 'Bánh', 'Lộc'];
     for (let i = 0; i < n; i++) {
       const z = -len / 2 + 2.1 + i * 4.2;
       const shop = new THREE.Group();
@@ -392,7 +392,7 @@ export class Nature {
   /** Wall of decorated sake barrels (kazaridaru), as at Meiji Jingū */
   barrels(cols: number, rows: number): THREE.Group {
     const g = new THREE.Group();
-    const names = ['菊正宗', '白鶴', '月桂冠', '大関', '剣菱', '松竹梅', '賀茂鶴', '沢の鶴', '日本盛', '黄桜'];
+    const names = ['Rượu', 'Lộc', 'Phúc', 'An', 'Khang', 'Thọ', 'Tài', 'Hòa', 'Bình', 'Vui'];
     const colors = ['#f6f1e6', '#1d3a6b', '#b8261b', '#f6f1e6', '#2a2a2a'];
     g.add(new THREE.Mesh(new THREE.BoxGeometry(cols * 1.3 + 0.6, 0.6, 1.6), this.m.wood.darkWood));
     (g.children[0] as THREE.Mesh).position.y = 0.3;

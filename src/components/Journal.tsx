@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Lock } from 'lucide-react';
+import { Lock, Moon } from 'lucide-react';
 import { Sheet } from './ui/Sheet';
 import { KhanArt, LocArt } from './LocArt';
 import { XamSlip } from './Rituals';
-import { PALACES, LEGEND_INDEX, TOTAL_DISCOVERIES } from '../data/story';
+import { PALACES, LEGEND_INDEX, SECRETS, nextSecret } from '../data/story';
 import { LOC, XAM, type LocKind } from '../data/rituals';
 import { useStory } from '../services/storyService';
 import { useLuck } from './LuckAndLegends';
@@ -12,10 +12,13 @@ import type { StoryCard } from '../three/encounters/types';
 /**
  * The pilgrim's journal: the four scarves, everything discovered, and the pouch.
  */
-export const JournalSheet: React.FC<{ onClose: () => void; onOpenCard: (c: StoryCard) => void; initial?: 'story' | 'found' | 'pouch' }> = ({ onClose, onOpenCard, initial = 'story' }) => {
+export const JournalSheet: React.FC<{ onClose: () => void; onOpenCard: (c: StoryCard) => void; onWatchFilm?: () => void; initial?: 'story' | 'found' | 'trail' | 'pouch' }> = ({ onClose, onOpenCard, onWatchFilm, initial = 'story' }) => {
   const story = useStory();
   const { found } = useLuck();
-  const [tab, setTab] = useState(initial);
+  const [tab, setTab] = useState<'story' | 'found' | 'trail' | 'pouch'>(initial);
+  const legends = LEGEND_INDEX.filter((l) => l.kind !== 'secret');
+  const current = nextSecret(found);
+  const trailDone = SECRETS.filter((x) => found.includes(x.id)).length;
   const [xamOpen, setXamOpen] = useState<number | null>(null);
   return (
     <Sheet onClose={onClose} size="lg" label="Journal" className="px-5 sm:px-7 pt-3 sm:pt-6">
@@ -23,15 +26,16 @@ export const JournalSheet: React.FC<{ onClose: () => void; onOpenCard: (c: Story
         <span className="text-xs uppercase tracking-[0.18em] text-[#8e1b1b] font-semibold">Sổ tay hành hương</span>
         <h2 className="text-xl sm:text-2xl font-display font-bold text-[#2a1d14] mt-0.5">Your journal</h2>
       </div>
-      <div className="mt-4 grid grid-cols-3 gap-1 p-1 rounded-xl bg-[#ece2cf]" role="tablist">
+      <div className="mt-4 grid grid-cols-4 gap-1 p-1 rounded-xl bg-[#ece2cf]" role="tablist">
         {(
           [
             ['story', 'Scarves', `${story.khan.length}/4`],
-            ['found', 'Discoveries', `${found.length}/${TOTAL_DISCOVERIES}`],
+            ['found', 'Legends', `${legends.filter((l) => found.includes(l.id)).length}/${legends.length}`],
+            ['trail', 'Trail', `${trailDone}/${SECRETS.length}`],
             ['pouch', 'Pouch', `${story.pouch.length}`],
           ] as const
         ).map(([k, l, c]) => (
-          <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`py-2 rounded-lg text-sm font-semibold cursor-pointer ${tab === k ? 'bg-[#fffaf0] text-[#8e1b1b] shadow-sm' : 'text-[#5a4837]'}`}>
+          <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`py-2 rounded-lg text-[13px] sm:text-sm font-semibold cursor-pointer flex flex-col sm:flex-row items-center justify-center sm:gap-1 ${tab === k ? 'bg-[#fffaf0] text-[#8e1b1b] shadow-sm' : 'text-[#5a4837]'}`}>
             {l} <span className="text-xs font-normal tabular-nums opacity-80">{c}</span>
           </button>
         ))}
@@ -49,7 +53,7 @@ export const JournalSheet: React.FC<{ onClose: () => void; onOpenCard: (c: Story
                     <KhanArt color={p.color} size={52} dim={!done} />
                     <div>
                       <div className="font-display font-bold text-[#2a1d14]">
-                        {p.vi} <span className="font-han font-normal text-[#8e1b1b]">{p.han}</span>
+                        {p.vi}
                       </div>
                       <div className="text-xs text-[#5a4837]">
                         {p.en} · {p.mother}
@@ -69,9 +73,18 @@ export const JournalSheet: React.FC<{ onClose: () => void; onOpenCard: (c: Story
         </div>
       )}
 
+      {tab === 'found' && onWatchFilm && (
+        <button onClick={onWatchFilm} className="mt-4 w-full flex items-center gap-3 p-3 rounded-2xl bg-[#2a1410] text-[#fbeed2] text-left cursor-pointer hover:bg-[#3a1c16]">
+          <span className="w-10 h-10 rounded-full bg-[#8e1b1b] flex items-center justify-center shrink-0">▶</span>
+          <span>
+            <span className="block text-sm font-semibold">The Mothers of the Four Palaces</span>
+            <span className="block text-xs opacity-80">A short narrated film: the real history and legends · ~4 min</span>
+          </span>
+        </button>
+      )}
       {tab === 'found' && (
         <ul className="mt-4 space-y-2 pb-1">
-          {LEGEND_INDEX.map((l) => {
+          {legends.map((l) => {
             const isFound = found.includes(l.id);
             const card = story.cards[l.id];
             return (
@@ -93,6 +106,43 @@ export const JournalSheet: React.FC<{ onClose: () => void; onOpenCard: (c: Story
             );
           })}
         </ul>
+      )}
+
+      {tab === 'trail' && (
+        <div className="mt-4 pb-1">
+          <p className="text-[13px] text-[#5a4837] mb-3">The grounds keep {SECRETS.length} secrets. They reveal themselves one at a time: solve a riddle and the next one wakes.</p>
+          <ol className="relative space-y-2 before:absolute before:left-[17px] before:top-3 before:bottom-3 before:w-px before:bg-[#e0d2ba]">
+            {SECRETS.map((sec, i) => {
+              const isFound = found.includes(sec.id);
+              const isNow = current?.id === sec.id;
+              const card = story.cards[sec.id];
+              return (
+                <li key={sec.id} className="relative">
+                  <button
+                    disabled={!isFound || !card}
+                    onClick={() => card && onOpenCard(card)}
+                    className={`w-full text-left flex items-start gap-3 p-2.5 rounded-xl border transition-colors ${isFound ? 'bg-[#fffaf0] border-[#e0d2ba] hover:border-[#8e1b1b] cursor-pointer' : isNow ? 'bg-[#fff6e0] border-[#e0a92a]' : 'bg-[#f3ece0] border-transparent'}`}
+                  >
+                    <span className={`relative z-10 w-[26px] h-[26px] mt-0.5 rounded-full flex items-center justify-center shrink-0 text-[12px] font-bold ${isFound ? 'bg-[#8e1b1b] text-[#fff4dc]' : isNow ? 'bg-[#e0a92a] text-[#2a1d14] animate-pulse' : 'bg-[#e0d4c0] text-[#8a7762]'}`}>
+                      {isFound ? '✦' : i + 1}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold text-[#2a1d14]">{isFound ? sec.card.title : isNow ? 'Now seeking…' : '???'}</span>
+                      {isFound && <span className="block text-xs text-[#5a4837]">Tap to read again</span>}
+                      {isNow && <span className="block text-[13px] italic text-[#4a3826] font-display leading-snug">“{sec.riddle}”</span>}
+                      {isNow && sec.trigger === 'night' && (
+                        <span className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-[#4b5aa0]">
+                          <Moon className="w-3 h-3" /> Only revealed at night
+                        </span>
+                      )}
+                      {!isFound && !isNow && <span className="block text-xs text-[#8a7762]">Still asleep</span>}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
       )}
 
       {tab === 'pouch' && (

@@ -32,7 +32,7 @@ export const LocArt: React.FC<{ kind: LocKind; size?: number; title?: string }> 
           <path d="M14 22Q30 14 46 22V62Q46 68 40 68H20Q14 68 14 62Z" fill="#c0262d" stroke="#7d1414" strokeWidth="1.6" />
           <path d="M18 25Q30 19 42 25V60Q42 64 38 64H22Q18 64 18 60Z" fill="none" stroke="#f2c14e" strokeWidth="0.8" strokeDasharray="1.5 1.3" />
           <circle cx="30" cy="42" r="10" fill="#fff6e0" stroke="#f2c14e" strokeWidth="1.2" />
-          <text x="30" y="47.5" textAnchor="middle" fontSize="14" fontWeight="700" fill="#c0262d" fontFamily="'Noto Serif TC', serif">安</text>
+          <text x="30" y="45" textAnchor="middle" fontSize="8" fontWeight="700" fill="#c0262d" fontFamily="'Noto Serif', serif">AN</text>
           <Knot />
           <Tassel y={70} />
         </Svg>
@@ -49,7 +49,7 @@ export const LocArt: React.FC<{ kind: LocKind; size?: number; title?: string }> 
           <path d="M22 18Q30 22 38 18L44 26Q52 46 44 62Q38 70 30 70Q22 70 16 62Q8 46 16 26Z" fill={`url(#b${id})`} stroke="#8a5a00" strokeWidth="1.6" />
           <path d="M20 26Q30 31 40 26" stroke="#c0262d" strokeWidth="2.4" fill="none" strokeLinecap="round" />
           <circle cx="30" cy="48" r="8" fill="#c0262d" />
-          <text x="30" y="52.5" textAnchor="middle" fontSize="11" fontWeight="700" fill="#f6dc7a" fontFamily="'Noto Serif TC', serif">祿</text>
+          <text x="30" y="51" textAnchor="middle" fontSize="6.5" fontWeight="700" fill="#f6dc7a" fontFamily="'Noto Serif', serif">LỘC</text>
           <path d="M22 18Q30 8 38 18" stroke="#c0262d" strokeWidth="2.2" fill="none" />
           <Tassel c="#c0262d" y={72} />
         </Svg>
@@ -75,8 +75,8 @@ export const LocArt: React.FC<{ kind: LocKind; size?: number; title?: string }> 
           <circle cx="30" cy="46" r="17" fill="#d9a21a" stroke="#8a5a00" strokeWidth="1.8" />
           <circle cx="30" cy="46" r="13.5" fill="none" stroke="#8a5a00" strokeWidth="0.8" />
           <rect x="25" y="41" width="10" height="10" fill="#fbf3e2" stroke="#8a5a00" strokeWidth="1.2" />
-          {[['通', 30, 37], ['寶', 30, 60], ['元', 19, 49], ['豐', 41, 49]].map(([c, x, y]) => (
-            <text key={c as string} x={x as number} y={y as number} textAnchor="middle" fontSize="7" fontWeight="700" fill="#6b4500" fontFamily="'Noto Serif TC', serif">
+          {[['AN', 30, 38.5], ['LỘC', 30, 57.5], ['PHÚC', 19.6, 48.5], ['THỌ', 40.4, 48.5]].map(([c, x, y]) => (
+            <text key={c as string} x={x as number} y={y as number} textAnchor="middle" fontSize="4" fontWeight="700" fill="#6b4500" fontFamily="'Noto Serif', serif">
               {c}
             </text>
           ))}
@@ -100,7 +100,7 @@ export const LocArt: React.FC<{ kind: LocKind; size?: number; title?: string }> 
             <ellipse rx="4.2" ry="11" fill="#fbd0dc" stroke="#c94a6a" strokeWidth="0.7" transform="translate(0 -6)" />
             <path d="M-12 6Q0 12 12 6" stroke="#4f8a3e" strokeWidth="2" fill="none" />
           </g>
-          <text x="30" y="64" textAnchor="middle" fontSize="6" fontWeight="700" fill="#4a2f14" fontFamily="'Noto Serif TC', serif">清心</text>
+          <text x="30" y="64" textAnchor="middle" fontSize="5" fontWeight="700" fill="#4a2f14" fontFamily="'Noto Serif', serif">TÂM AN</text>
         </Svg>
       );
     case 'quat':

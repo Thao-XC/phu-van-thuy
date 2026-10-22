@@ -65,7 +65,7 @@ export const QUE: Record<QueResult, { vi: string; en: string; meaning: string }>
 export type LocKind = 'binh-an' | 'tai-loc' | 'chi-do' | 'dong-tien' | 'the-sen' | 'quat';
 
 export const LOC: Record<LocKind, { vi: string; en: string; blurb: string; color: string }> = {
-  'binh-an': { vi: 'Bùa bình an', en: 'Peace & safety charm', blurb: 'A red cloth pouch with the character 安 (an, peace), for safe days and safe travels.', color: '#c0262d' },
+  'binh-an': { vi: 'Bùa bình an', en: 'Peace & safety charm', blurb: 'A red cloth pouch with the word “an” (peace), for safe days and safe travels.', color: '#c0262d' },
   'tai-loc': { vi: 'Túi gấm tài lộc', en: 'Brocade pouch of fortune', blurb: 'Gold brocade with a tassel, for prosperity and good business.', color: '#c99212' },
   'chi-do': { vi: 'Vòng chỉ đỏ', en: 'Red thread bracelet', blurb: 'The red thread of Ông Tơ Bà Nguyệt, the old couple in the moon who tie together people meant to meet.', color: '#d6364b' },
   'dong-tien': { vi: 'Đồng tiền may mắn', en: 'Lucky coin', blurb: 'An old round coin with a square hole, on a red string. Round for heaven, square for earth.', color: '#a37c00' },

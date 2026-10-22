@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { Architecture } from './architecture';
 import type { KitMaterials } from './materials';
-import { kanjiTexture } from './materials';
+import { viTexture } from './materials';
 
 /**
  * Vietnamese temple kit: upturned "đầu đao" roof corners, ridges with "lưỡng long chầu nguyệt"
@@ -144,9 +144,9 @@ const tube = (pts: [number, number, number][], r: number, m: THREE.Material, tap
   return mesh;
 };
 
-/** a texture with Hán characters, gold on red (or any colours) */
+/** a texture with Vietnamese lettering, gold on red (or any colours) */
 const hanTex = (text: string, vertical = true, bg = '#7d1414', fg = '#f2c14e') =>
-  kanjiTexture(text, bg, fg, vertical ? 128 : 512, vertical ? 512 : 160, vertical);
+  viTexture(text, bg, fg, vertical ? 128 : 640, vertical ? 768 : 168, vertical);
 
 export class VietKit {
   readonly v: VietMats;
@@ -383,7 +383,7 @@ export class VietKit {
       g.add(p);
     });
     // couplets on the front piers
-    [[-4.1, '雲山千古秀'], [4.1, '水月萬年清']].forEach(([x, t]) => {
+    [[-4.1, 'Núi mây ngàn năm đẹp'], [4.1, 'Trăng nước vạn thuở trong']].forEach(([x, t]) => {
       const c = this.couplet(t as string, 3.2);
       c.position.set(x as number, 2.6, 1.13);
       g.add(c);
@@ -554,7 +554,7 @@ export class VietKit {
       const grill = new THREE.Mesh(new THREE.CircleGeometry(0.85, 24), std({ color: 0x2a120c }));
       grill.position.set(bx(i), fy + wallH * 0.55, d / 2 + 0.08);
       g.add(grill);
-      const ch = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.2), new THREE.MeshBasicMaterial({ map: kanjiTexture(i === 0 ? '福' : '壽', 'rgba(0,0,0,0)', '#f2c14e', 128, 128, false), transparent: true }));
+      const ch = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.2), new THREE.MeshBasicMaterial({ map: viTexture(i === 0 ? 'PHÚC' : 'THỌ', 'rgba(0,0,0,0)', '#f2c14e', 256, 128, false), transparent: true }));
       ch.position.set(bx(i), fy + wallH * 0.55, d / 2 + 0.12);
       g.add(ch);
     });
@@ -579,7 +579,7 @@ export class VietKit {
     const pl = this.plaque(o.name, 4.2, 1.1);
     pl.position.set(0, fy + wallH + 0.2, d / 2 + 0.35);
     g.add(pl);
-    [[bx(1) - bw / 2, '母儀天下'], [bx(3) + bw / 2, '恩澤萬民']].forEach(([x, txt]) => {
+    [[bx(1) - bw / 2, 'Mẫu nghi thiên hạ'], [bx(3) + bw / 2, 'Ân trạch vạn dân']].forEach(([x, txt]) => {
       const c = this.couplet(txt as string, 3.6);
       c.position.set(x as number, fy + 2.6, d / 2 + 0.32);
       g.add(c);
@@ -869,10 +869,152 @@ export class VietKit {
     [[-0.8, 0.9], [0.8, 0.9], [-0.8, -0.9], [0.8, -0.9]].forEach(([x, z]) => g.add(box(0.35, 0.25, 0.4, st, x, 0.12, z)));
     const slab = box(1.4, 2.4, 0.3, st, 0, 1.75, 0);
     g.add(slab);
-    const face = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 2.0), new THREE.MeshStandardMaterial({ map: kanjiTexture(text, '#8d918a', '#3a3d38', 128, 256, true), roughness: 0.95 }));
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 2.0), new THREE.MeshStandardMaterial({ map: viTexture(text, '#8d918a', '#3a3d38', 192, 384, true), roughness: 0.95 }));
     face.position.set(0, 1.75, 0.16);
     g.add(face);
     g.add(box(1.6, 0.3, 0.4, st, 0, 3.05, 0));
+    return g;
+  }
+
+  /** Stone village well with a wooden frame and bucket */
+  well(): THREE.Group {
+    const g = new THREE.Group();
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.05, 0.8, 18, 1, true), this.v.stone);
+    (rim.material as THREE.MeshStandardMaterial).side = THREE.DoubleSide;
+    rim.position.y = 0.4;
+    g.add(rim);
+    const lip = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.1, 6, 20), this.v.stone);
+    lip.rotation.x = Math.PI / 2;
+    lip.position.y = 0.8;
+    g.add(lip);
+    const water = new THREE.Mesh(new THREE.CircleGeometry(0.95, 18), new THREE.MeshStandardMaterial({ color: 0x1d3b3a, roughness: 0.1 }));
+    water.rotation.x = -Math.PI / 2;
+    water.position.y = 0.25;
+    g.add(water);
+    [-1.1, 1.1].forEach((x) => g.add(box(0.12, 2.2, 0.12, this.v.wood, x, 1.1, 0)));
+    g.add(box(2.4, 0.1, 0.1, this.v.wood, 0, 2.15, 0));
+    // a plain little tiled gable
+    [-1, 1].forEach((sd) => {
+      const slab = box(2.8, 0.08, 1.0, this.v.tile, 0, 2.45, sd * 0.42);
+      slab.rotation.x = sd * 0.55;
+      g.add(slab);
+    });
+    const rope = cyl(0.01, 0.01, 1.3, this.v.wood, 0.2, 1.5, 0, 4);
+    g.add(rope);
+    g.add(cyl(0.16, 0.13, 0.25, this.v.wood, 0.2, 0.85, 0, 10));
+    return g;
+  }
+
+  /** A painted paper horse (ngựa giấy) on a little bamboo stand, waiting to be burned */
+  paperHorse(): THREE.Group {
+    const g = new THREE.Group();
+    const white = std({ color: 0xf6f1e6, roughness: 0.8 });
+    const red = std({ color: 0xc81e1e, roughness: 0.7 });
+    const gold = this.v.gold;
+    g.add(box(1.4, 0.08, 0.6, std({ color: 0x9fae62 }), 0, 0.15, 0));
+    [-0.5, 0.5].forEach((x) => [-0.18, 0.18].forEach((z) => g.add(box(0.1, 0.8, 0.1, white, x, 0.55, z))));
+    g.add(box(1.2, 0.5, 0.45, white, 0, 1.1, 0));
+    g.add(box(1.22, 0.14, 0.47, red, 0, 1.05, 0));
+    const neck = box(0.3, 0.7, 0.3, white, 0.65, 1.45, 0);
+    neck.rotation.z = -0.5;
+    g.add(neck);
+    g.add(box(0.5, 0.26, 0.26, white, 0.92, 1.78, 0));
+    g.add(box(0.18, 0.5, 0.06, red, 0.5, 1.6, 0));
+    [-0.13, 0.13].forEach((z) => {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 4), std({ color: 0x111111 }));
+      eye.position.set(1.02, 1.85, z);
+      g.add(eye);
+    });
+    g.add(box(0.5, 0.06, 0.5, gold, -0.1, 1.38, 0));
+    const tail = tube([[-0.6, 1.2, 0], [-0.85, 1.0, 0], [-0.9, 0.7, 0]], 0.06, std({ color: 0x2a2a2a }));
+    g.add(tail);
+    return g;
+  }
+
+  /** Kapok tree (cây gạo): tall bare trunk, few branches, big red flowers */
+  kapok(s = 1): THREE.Group {
+    const g = new THREE.Group();
+    const bark = std({ color: 0x8a7a68, roughness: 0.95, flatShading: true });
+    for (let k = 0; k < 5; k++) {
+      const a = (k / 5) * Math.PI * 2;
+      g.add(tube([[Math.cos(a) * 1.6 * s, 0, Math.sin(a) * 1.6 * s], [Math.cos(a) * 0.6 * s, 1.2 * s, Math.sin(a) * 0.6 * s], [0, 3 * s, 0]], 0.35 * s, bark, false));
+    }
+    g.add(cyl(0.45 * s, 0.7 * s, 12 * s, bark, 0, 6 * s, 0, 9));
+    const red = std({ color: 0xd42a1a, roughness: 0.6, emissive: 0x3a0800 });
+    for (let k = 0; k < 7; k++) {
+      const a = k * 0.9, y = (7 + k * 0.9) * s, L = (2.4 + (k % 3)) * s;
+      const end: [number, number, number] = [Math.cos(a) * L, y + 1.2 * s, Math.sin(a) * L];
+      g.add(tube([[0, y, 0], [Math.cos(a) * L * 0.5, y + 0.4 * s, Math.sin(a) * L * 0.5], end], 0.14 * s, bark));
+      for (let f = 0; f < 6; f++) {
+        const fl = new THREE.Mesh(new THREE.IcosahedronGeometry(0.22 * s, 0), red);
+        fl.position.set(end[0] + (Math.random() - 0.5) * 1.2 * s, end[1] + (Math.random() - 0.3) * 0.8 * s, end[2] + (Math.random() - 0.5) * 1.2 * s);
+        g.add(fl);
+      }
+    }
+    return g;
+  }
+
+  /** A betel vine spiralling up a trunk (for the areca palm of the trầu cau legend) */
+  betelVine(h: number, r: number): THREE.Group {
+    const g = new THREE.Group();
+    const pts: [number, number, number][] = [];
+    for (let i = 0; i <= 30; i++) {
+      const t = i / 30, a = t * Math.PI * 2 * 4;
+      pts.push([Math.cos(a) * r, 0.2 + t * h, Math.sin(a) * r]);
+    }
+    const leafM = std({ color: 0x3f8a3a, roughness: 0.7, side: THREE.DoubleSide });
+    g.add(tube(pts, 0.03, std({ color: 0x4f7a2a }), false));
+    pts.forEach(([x, y, z], i) => {
+      if (i % 2) return;
+      const leaf = new THREE.Mesh(new THREE.CircleGeometry(0.16, 6), leafM);
+      leaf.position.set(x * 1.3, y, z * 1.3);
+      leaf.lookAt(x * 4, y + 0.3, z * 4);
+      g.add(leaf);
+    });
+    return g;
+  }
+
+  /** Water-puppet pavilion (thủy đình): a little stage on stilts, the puppeteers hidden behind a bamboo blind */
+  thuyDinh(): THREE.Group {
+    const g = new THREE.Group();
+    const posts = this.v.darkLacquer;
+    [[-2.4, -1.8], [2.4, -1.8], [-2.4, 1.8], [2.4, 1.8], [0, -1.8], [0, 1.8]].forEach(([x, z]) => g.add(cyl(0.14, 0.16, 1.4, this.v.stone, x, -0.4, z, 8)));
+    g.add(box(5.4, 0.25, 4.2, this.v.wood, 0, 0.35, 0));
+    [-2.4, 2.4].forEach((x) => [-1.8, 1.8].forEach((z) => g.add(cyl(0.11, 0.11, 2.6, posts, x, 1.75, z, 8))));
+    // red back wall and the bamboo blind (mành) the puppets come out from under
+    g.add(box(5.0, 2.6, 0.12, this.v.lacquer, 0, 1.75, -1.6));
+    g.add(box(4.6, 1.5, 0.05, std({ color: 0xc9a35a, roughness: 0.8 }), 0, 1.3, 1.82));
+    for (let i = 0; i < 18; i++) g.add(box(0.02, 1.5, 0.06, std({ color: 0x8a6a2a }), -2.25 + i * 0.265, 1.3, 1.85));
+    g.add(box(5.2, 0.5, 0.1, this.v.lacquer, 0, 3.0, 1.9));
+    g.add(box(4.0, 0.36, 0.04, this.v.gold, 0, 3.0, 1.96));
+    const roof = this.roof({ w: 6.4, d: 5.0, h: 1.4, curl: 0.8 });
+    roof.position.y = 3.05;
+    g.add(roof);
+    // puppets on the water in front of the stage: a dragon, two fairies and Chú Tễu the jester
+    const p = new THREE.Group();
+    const fairy = (c: number, x: number) => {
+      const f = new THREE.Group();
+      f.add(cyl(0.12, 0.22, 0.5, std({ color: c, roughness: 0.6 }), 0, 0.25, 0, 10));
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), std({ color: 0xf1cfa6 }));
+      head.position.y = 0.6;
+      f.add(head);
+      f.add(cyl(0.1, 0.13, 0.07, this.v.gold, 0, 0.72, 0, 10));
+      f.position.set(x, 0, 2.9);
+      return f;
+    };
+    p.add(fairy(0xc81e1e, -1.2), fairy(0x3f8a3a, 1.2));
+    const teu = new THREE.Group();
+    teu.add(cyl(0.18, 0.2, 0.45, std({ color: 0xf2d27a }), 0, 0.22, 0, 10));
+    const th = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), std({ color: 0xf1cfa6 }));
+    th.position.y = 0.6;
+    teu.add(th);
+    teu.position.set(0, 0, 3.3);
+    p.add(teu);
+    const dragon = tube([[-2.2, 0.1, 4.2], [-1.4, 0.45, 4.0], [-0.6, 0.1, 4.3], [0.4, 0.4, 4.1], [1.2, 0.15, 4.4]], 0.12, std({ color: 0xd4a017, metalness: 0.3, roughness: 0.4 }));
+    p.add(dragon);
+    p.position.y = -0.25;
+    g.add(p);
+    g.userData.puppets = p;
     return g;
   }
 }

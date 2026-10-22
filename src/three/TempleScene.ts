@@ -24,6 +24,12 @@ export interface SceneCallbacks {
   onCaption?: (text: string, seconds?: number) => void;
   /** may the visitor enter this realm yet? true, or a caption explaining why not */
   canEnter?: (id: string) => true | string;
+  /** the first frame has been drawn */
+  onReady?: () => void;
+  /** a floating place marker was clicked */
+  onSpotClick?: (spotId: string) => void;
+  /** PC: the place marker under the crosshair changed */
+  onAim?: (spotId: string | null) => void;
 }
 
 const POCKET_Y = -600;
@@ -117,6 +123,7 @@ export class TempleScene {
 
   private isRunning = false;
   private bobT = 0;
+  private readySent = false;
   private lastTime = 0;
   private animFrameId: number | null = null;
 
@@ -340,6 +347,7 @@ export class TempleScene {
       this.waterBaseY = res.bobbingWater.position.y;
     }
     this.spots = res.spots;
+    this.buildMarkers();
     this.bellObj = this.scene.getObjectByName('bell') ?? null;
     this.createParticles(this.particleKind);
     this.playerPosition.set(res.spawn.x, 1.7 + this.ground(res.spawn.x, res.spawn.z), res.spawn.z);
@@ -535,7 +543,20 @@ export class TempleScene {
     document.addEventListener('pointerlockchange', this.lockListener);
   }
 
+  /** false while a panel is open: the visitor stands still and keys belong to the panel */
+  private _input = true;
+  public set inputEnabled(v: boolean) {
+    this._input = v;
+    if (!v) this.keysPressed = {};
+  }
+  public get inputEnabled() {
+    return this._input;
+  }
+
   private onKeyDown = (e: KeyboardEvent) => {
+    const t = e.target as HTMLElement | null;
+    if (!this._input || (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable))) return;
+    if (e.code.startsWith('Arrow')) e.preventDefault();
     this.keysPressed[e.code] = true;
     if (e.code === 'KeyB' && !e.repeat) this.bow();
   };
@@ -565,7 +586,48 @@ export class TempleScene {
     this.playerPitch = Math.max(-Math.PI / 2.4, Math.min(Math.PI / 2.4, this.playerPitch));
   }
 
+  private _raycaster = new THREE.Raycaster();
+  private _ndc = new THREE.Vector2();
+  private _downAt = { x: 0, y: 0, t: 0 };
+  /** which floating place marker is at this screen point (or the crosshair when the mouse is captured) */
+  private pickMarker(clientX?: number, clientY?: number): string | null {
+    if (this.enc) return null;
+    const vis = this.markers.filter((m) => m.g.visible);
+    if (!vis.length) return null;
+    if (clientX === undefined || clientY === undefined) this._ndc.set(0, 0);
+    else {
+      const r = this.renderer.domElement.getBoundingClientRect();
+      this._ndc.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+    }
+    this._raycaster.setFromCamera(this._ndc, this.camera);
+    const hits = this._raycaster.intersectObjects(vis.map((m) => m.g), true);
+    if (!hits.length) return null;
+    const m = vis.find((x) => x.g === hits[0].object.parent);
+    return m?.spot.id ?? null;
+  }
+  private aimed: string | null = null;
+  private aimT = 0;
+  private updateAim(dt: number) {
+    this.aimT += dt;
+    if (this.aimT < 0.12) return;
+    this.aimT = 0;
+    const id = this.pointerLocked ? this.pickMarker() : null;
+    if (id !== this.aimed) {
+      this.aimed = id;
+      this.callbacks.onAim?.(id);
+    }
+  }
+
   private onPointerDown = (e: PointerEvent) => {
+    this._downAt = { x: e.clientX, y: e.clientY, t: performance.now() };
+    // clicking a floating place marker goes there instead of capturing the mouse
+    if (!this.pointerLocked && e.button === 0) {
+      const id = this.pickMarker(e.clientX, e.clientY);
+      if (id) {
+        this.callbacks.onSpotClick?.(id);
+        return;
+      }
+    }
     // PC: a click on the view captures the mouse for free looking (Esc releases it)
     if (e.pointerType === 'mouse' && this.look.pointerLock && !this.pointerLocked && e.button === 0) {
       try {
@@ -657,9 +719,23 @@ export class TempleScene {
     }
   }
 
-  private onPointerUp = () => {
+  private onPointerUp = (e: PointerEvent) => {
     this.isDragging = false;
+    // mouse captured: a click picks whatever marker is under the crosshair
+    if (this.pointerLocked && e.button === 0 && performance.now() - this._downAt.t < 350) {
+      const id = this.pickMarker();
+      if (id) this.callbacks.onSpotClick?.(id);
+    }
   };
+
+  /** a short dip to black, then arrive at the place */
+  public travelToSpot(spotId: string, then?: () => void) {
+    this.fadeTo(0x000000, 1, 0.25, () => {
+      this.teleportToSpot(spotId);
+      this.fadeTo(0x000000, 0, 0.35);
+      then?.();
+    });
+  }
 
   private onWindowResize = () => {
     if (!this.container) return;
@@ -687,6 +763,8 @@ export class TempleScene {
     this.updateManners(delta);
     this.updateParticles(delta);
     this.updateLanterns(delta);
+    this.updateShimmer();
+    this.updateMarkers();
     if (this.nature) {
       const t = now / 1000;
       this.nature.animated.forEach((a) => a.update(t));
@@ -696,8 +774,13 @@ export class TempleScene {
     this.sunLight.position.copy(this.playerPosition).add(this.sunOffset);
     this.updateLightingCycle(delta);
     this.checkNearbySpots();
+    this.updateAim(delta);
 
     this.renderer.render(this.scene, this.camera);
+    if (!this.readySent) {
+      this.readySent = true;
+      this.callbacks.onReady?.();
+    }
     this.animFrameId = requestAnimationFrame(this.animate);
   };
 
@@ -742,11 +825,17 @@ export class TempleScene {
       this.playerPosition.addScaledVector(this._forward, -moveSpeed);
       moved = true;
     }
-    if (this.keysPressed['KeyA'] || this.keysPressed['ArrowLeft']) {
+    // ← → turn on the spot (keyboard-only visitors), A D step sideways
+    const turnRate = (running ? 2.6 : 1.9) * delta * (frozen ? 0 : 1);
+    if (this.keysPressed['ArrowLeft']) this.playerRotationY += turnRate;
+    if (this.keysPressed['ArrowRight']) this.playerRotationY -= turnRate;
+    if (this.keysPressed['PageUp']) this.playerPitch = Math.min(Math.PI / 2.4, this.playerPitch + delta);
+    if (this.keysPressed['PageDown']) this.playerPitch = Math.max(-Math.PI / 2.4, this.playerPitch - delta);
+    if (this.keysPressed['KeyA']) {
       this.playerPosition.addScaledVector(this._right, -moveSpeed);
       moved = true;
     }
-    if (this.keysPressed['KeyD'] || this.keysPressed['ArrowRight']) {
+    if (this.keysPressed['KeyD']) {
       this.playerPosition.addScaledVector(this._right, moveSpeed);
       moved = true;
     }
@@ -1160,6 +1249,124 @@ export class TempleScene {
     }
   }
 
+  /* ---------------- the secret trail ---------------- */
+  private activeSecret: string | null = null;
+  private shimmer: THREE.Group | null = null;
+  /** Only this secret can be found right now; a faint shimmer shows where it is when you're close */
+  public setActiveSecret(id: string | null, alreadyFound: string[] = []) {
+    alreadyFound.forEach((f) => this.secretsFound.add(f));
+    this.activeSecret = id;
+    const d = this.secrets.find((x) => x.id === id);
+    if (!this.shimmer) {
+      const g = new THREE.Group();
+      const n = 40;
+      const pos = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2, r = 0.3 + Math.random() * 0.9;
+        pos.set([Math.cos(a) * r, Math.random() * 2.2, Math.sin(a) * r], i * 3);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      const dot = document.createElement('canvas');
+      dot.width = dot.height = 32;
+      const dg = dot.getContext('2d')!;
+      const grad = dg.createRadialGradient(16, 16, 0, 16, 16, 16);
+      grad.addColorStop(0, 'rgba(255,255,255,1)');
+      grad.addColorStop(0.35, 'rgba(255,230,160,0.8)');
+      grad.addColorStop(1, 'rgba(255,200,90,0)');
+      dg.fillStyle = grad;
+      dg.fillRect(0, 0, 32, 32);
+      const map = new THREE.CanvasTexture(dot);
+      g.add(new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xffe08a, map, size: 0.16, transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending })));
+      const glow = new THREE.PointLight(0xffd27a, 0, 6, 2);
+      glow.position.y = 1;
+      g.add(glow);
+      g.userData.glow = glow;
+      this.scene.add(g);
+      this.shimmer = g;
+    }
+    if (d) this.shimmer.position.set(d.at[0], this.ground(d.at[0], d.at[1]), d.at[1]);
+    this.shimmer.visible = false;
+  }
+  /** metres to the active secret (null if none / inside a realm) */
+  public get activeSecretDistance(): number | null {
+    const d = this.secrets.find((x) => x.id === this.activeSecret);
+    if (!d || this.enc) return null;
+    return Math.hypot(this.playerPosition.x - d.at[0], this.playerPosition.z - d.at[1]);
+  }
+  private updateShimmer() {
+    const g = this.shimmer;
+    if (!g) return;
+    const d = this.secrets.find((x) => x.id === this.activeSecret);
+    const near = d && !this.enc ? Math.hypot(this.playerPosition.x - d.at[0], this.playerPosition.z - d.at[1]) : 99;
+    const ok = d && !this.secretsFound.has(d.id) && (d.trigger !== 'night' || this.timeOfDay === 'night');
+    g.visible = !!ok && near < 16;
+    if (!g.visible) return;
+    const k = Math.max(0, 1 - near / 16);
+    g.rotation.y = this.elapsed * 0.4;
+    const pts = g.children[0] as THREE.Points;
+    (pts.material as THREE.PointsMaterial).opacity = (0.35 + Math.sin(this.elapsed * 2.4) * 0.15) * (0.4 + k);
+    (g.userData.glow as THREE.PointLight).intensity = 1.5 * k;
+  }
+
+  /* ---------------- floating markers over things you can use ---------------- */
+  private markers: { spot: SpotDef; g: THREE.Group; baseY: number }[] = [];
+  private buildMarkers() {
+    const label = (vi: string, en: string) => {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 160;
+      const g = c.getContext('2d')!;
+      g.fillStyle = 'rgba(42,20,16,0.78)';
+      const r = 40;
+      g.beginPath();
+      g.roundRect(8, 8, 496, 144, r);
+      g.fill();
+      g.fillStyle = '#ffe2a0';
+      g.textAlign = 'center';
+      g.font = '600 62px "Be Vietnam Pro", system-ui, sans-serif';
+      g.fillText(vi, 256, 80);
+      g.fillStyle = '#f3e3c3';
+      g.font = '400 38px "Be Vietnam Pro", system-ui, sans-serif';
+      g.fillText(en, 256, 128);
+      const t = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.SRGBColorSpace;
+      return t;
+    };
+    const heights: Partial<Record<string, number>> = { altar: 4.2, bell: 4.6, fortune: 2.9, keeper: 2.6, river: 1.8, stall: 3.6 };
+    for (const spot of this.spots) {
+      if (spot.type === 'view') continue;
+      const g = new THREE.Group();
+      const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.16), new THREE.MeshBasicMaterial({ color: 0xf2c14e, transparent: true, opacity: 0.9 }));
+      gem.scale.y = 1.5;
+      g.add(gem);
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: label(spot.vi, spot.name), transparent: true, depthWrite: false, depthTest: false }));
+      sp.scale.set(1.9, 0.6, 1);
+      sp.position.y = 0.62;
+      sp.renderOrder = 10;
+      g.add(sp);
+      const lx = (spot.at[0] + spot.look[0]) / 2, lz = (spot.at[1] + spot.look[1]) / 2;
+      const baseY = this.ground(lx, lz) + (heights[spot.type] ?? 2.6);
+      g.position.set(lx, baseY, lz);
+      g.visible = false;
+      this.scene.add(g);
+      this.markers.push({ spot, g, baseY });
+    }
+  }
+  private updateMarkers() {
+    for (const m of this.markers) {
+      const d = Math.hypot(this.playerPosition.x - m.g.position.x, this.playerPosition.z - m.g.position.z);
+      const show = !this.enc && !this.isCinematicMode && d > 3.8 && d < 20;
+      m.g.visible = show;
+      if (!show) continue;
+      m.g.position.y = m.baseY + Math.sin(this.elapsed * 2 + m.g.position.x) * 0.08;
+      m.g.children[0].rotation.y = this.elapsed * 1.5;
+      const fade = Math.min(1, (20 - d) / 5) * Math.min(1, (d - 3.8) / 2);
+      ((m.g.children[1] as THREE.Sprite).material as THREE.SpriteMaterial).opacity = fade;
+      ((m.g.children[0] as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = 0.9 * fade;
+    }
+  }
+
   private foundSecret(d: SecretDef) {
     if (this.secretsFound.has(d.id)) return;
     this.secretsFound.add(d.id);
@@ -1207,6 +1414,8 @@ export class TempleScene {
     // secrets
     for (const d of this.secrets) {
       if (this.secretsFound.has(d.id)) continue;
+      // secrets wake up one at a time
+      if (d.id !== this.activeSecret) continue;
       const dist = Math.hypot(px - d.at[0], pz - d.at[1]);
       const r = d.r ?? 3;
       if (d.hint && dist < r * 2.2 && !this.secretHinted.has(d.id)) {

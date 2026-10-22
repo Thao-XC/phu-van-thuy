@@ -158,3 +158,43 @@ export function kanjiTexture(text: string, bg: string, fg: string, w = 256, h = 
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
+
+/** Vietnamese (quốc ngữ) calligraphy-style text: vertical boards stack one syllable per line */
+export function viTexture(text: string, bg: string, fg: string, w = 256, h = 512, vertical = true): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const g = c.getContext('2d')!;
+  const draw = () => {
+    g.clearRect(0, 0, w, h);
+    g.fillStyle = bg;
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = fg;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    const words = text.split(/\s+/).filter(Boolean);
+    const fontAt = (px: number) => `700 ${px}px "Noto Serif", "Times New Roman", serif`;
+    let lines: string[];
+    if (vertical) lines = words;
+    else {
+      // one line if it fits comfortably, otherwise two balanced lines
+      g.font = fontAt(h * 0.55);
+      lines = g.measureText(text).width < w * 0.9 || words.length < 2 ? [text] : [words.slice(0, Math.ceil(words.length / 2)).join(' '), words.slice(Math.ceil(words.length / 2)).join(' ')];
+    }
+    const lineH = (h * (vertical ? 0.86 : 0.8)) / lines.length;
+    let size = lineH * (vertical ? 0.62 : 0.78);
+    g.font = fontAt(size);
+    const widest = Math.max(...lines.map((l) => g.measureText(l).width));
+    if (widest > w * 0.88) size *= (w * 0.88) / widest;
+    g.font = fontAt(size);
+    const top = (h - lineH * lines.length) / 2;
+    lines.forEach((l, i) => g.fillText(l, w / 2, top + lineH * (i + 0.5)));
+    t.needsUpdate = true;
+  };
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  draw();
+  document.fonts?.ready.then(draw).catch(() => undefined);
+  return t;
+}

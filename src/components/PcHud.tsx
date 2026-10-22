@@ -85,12 +85,18 @@ export const SettingsSheet: React.FC<{ value: Settings; onChange: (s: Settings) 
 /* Controls                                                            */
 /* ------------------------------------------------------------------ */
 const KEYS: [string, string][] = [
-  ['W A S D / arrows', 'Walk'],
+  ['↑ / ↓', 'Walk forward and back'],
+  ['← / →', 'Turn left and right'],
+  ['W A S D', 'Walk and step sideways'],
   ['Shift', 'Hurry (not inside the temple!)'],
   ['Mouse', 'Click the view to look around; drag also works'],
-  ['E', 'Use what is in front of you'],
+  ['Click', 'A golden marker takes you to that place'],
+  ['E / Enter', 'Use what is in front of you'],
   ['B', 'Vái: bow with joined hands'],
+  ['PgUp / PgDn', 'Look up and down'],
   ['J', 'Journal'],
+  ['T', 'Secret trail'],
+  ['F', 'Film: the legend of the Mothers'],
   ['M', 'Minimap on/off'],
   ['H', 'Hide or show the control bar'],
   ['1 / 2 / 3', 'Day, dusk, night'],
