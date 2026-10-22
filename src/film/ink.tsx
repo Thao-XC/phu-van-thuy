@@ -229,7 +229,7 @@ export const InkDefs: React.FC = () => (
 /** The paper itself: a pigment wash, fibres, glints, and a printed double border */
 export const Paper: React.FC<{ wash: string }> = ({ wash }) => <rect width="1600" height="900" fill={wash} style={{ transition: 'fill 1.4s ease' }} />;
 
-export const PaperTop: React.FC<{ dim?: number }> = ({ dim = 0 }) => {
+export const PaperTop: React.FC<{ dim?: number; border?: boolean }> = ({ dim = 0, border = true }) => {
   const p = usePaper();
   return (
     <g pointerEvents="none">
@@ -237,8 +237,12 @@ export const PaperTop: React.FC<{ dim?: number }> = ({ dim = 0 }) => {
       {p.glint && <image href={p.glint} width="1600" height="900" preserveAspectRatio="none" style={{ mixBlendMode: 'screen' }} className="glint" />}
       <rect width="1600" height="900" fill="#1a0f0a" opacity={dim} style={{ transition: 'opacity 1.4s ease' }} />
       {/* printed border, as on the prints themselves */}
-      <rect x="14" y="14" width="1572" height="872" fill="none" stroke={INK.key} strokeWidth="7" />
-      <rect x="26" y="26" width="1548" height="848" fill="none" stroke={INK.key} strokeWidth="2.5" />
+      {border && (
+        <>
+          <rect x="14" y="14" width="1572" height="872" fill="none" stroke={INK.key} strokeWidth="7" />
+          <rect x="26" y="26" width="1548" height="848" fill="none" stroke={INK.key} strokeWidth="2.5" />
+        </>
+      )}
     </g>
   );
 };
