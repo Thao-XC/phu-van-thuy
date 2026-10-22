@@ -543,6 +543,12 @@ class SoundService {
   }
 
   /** Evening by the river: crickets, the odd bird, and now and then a đàn bầu glide */
+  private mood: 'day' | 'twilight' | 'night' = 'twilight';
+  /** the soundscape follows the time of day: birds by day, crickets and frogs at night */
+  public setMood(m: 'day' | 'twilight' | 'night') {
+    this.mood = m;
+  }
+
   public startAmbient() {
     if (this.isAmbientRunning) return;
     this.isAmbientRunning = true;
@@ -551,12 +557,30 @@ class SoundService {
     this.ambientInterval = window.setInterval(() => {
       if (this.isMuted || !this.ctx) return;
       const now = this.ctx.currentTime;
+      const night = this.mood === 'night';
       const r = Math.random();
-      if (r < 0.55) {
+      if (r < 0.1) {
+        // far away in the hall, someone is singing chầu văn: a few plucks of the moon lute
+        const scale = [293.7, 349.2, 392.0, 440.0, 523.3];
+        for (let i = 0; i < 4; i++) this.tone(scale[Math.floor(Math.random() * 5)], now + i * 0.32, 0.5, 0.018, 'triangle');
+        return;
+      }
+      if (r < 0.16) {
+        // the wooden fish (mõ) of a visitor's prayer
+        for (let i = 0; i < 3; i++) this.tone(820, now + i * 0.45, 0.06, 0.03, 'square', 760);
+        return;
+      }
+      if (night ? r < 0.85 : r < 0.3) {
+        if (night && Math.random() < 0.35) {
+          // frogs by the pond
+          this.tone(180 + Math.random() * 60, now, 0.12, 0.04, 'sawtooth', 120);
+          this.tone(200, now + 0.18, 0.1, 0.035, 'sawtooth', 130);
+          return;
+        }
         // crickets: quick high chirps
         const f = 4200 + Math.random() * 800;
         for (let i = 0; i < 3; i++) this.tone(f, now + i * 0.07, 0.05, 0.025, 'sine');
-      } else if (r < 0.8) {
+      } else if (r < 0.9) {
         // a bird
         this.tone(2400 + Math.random() * 600, now, 0.18, 0.03, 'sine', 3200);
         this.tone(2800, now + 0.22, 0.14, 0.025, 'sine', 2200);

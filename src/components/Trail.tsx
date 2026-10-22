@@ -28,7 +28,7 @@ const warmth = (d: number | null) => {
  * Objective tracker, top-left under the back button: the story goal and the current secret's riddle.
  * Secrets unlock one at a time; a warmth meter tells you whether you're near.
  */
-export const Tracker: React.FC<{ getDistance: () => number | null; isNight: boolean; onOpenTrail: () => void }> = ({ getDistance, isNight, onOpenTrail }) => {
+export const Tracker: React.FC<{ getDistance: () => number | null; isNight: boolean; onOpenTrail: () => void; onGuide: (what: 'story' | 'secret') => void }> = ({ getDistance, isNight, onOpenTrail, onGuide }) => {
   const goal = useStoryGoal();
   const { found } = useLuck();
   const secret = nextSecret(found);
@@ -66,7 +66,7 @@ export const Tracker: React.FC<{ getDistance: () => number | null; isNight: bool
   const w = secret && (secret.trigger !== 'night' || isNight) ? warmth(dist) : null;
 
   return (
-    <div className={`w-[min(300px,calc(100vw-1.5rem))] rounded-2xl bg-[#fbf3e2]/95 backdrop-blur-md border shadow-lg text-[#2a1d14] transition-shadow ${flash ? 'border-[#e0a92a] shadow-[0_0_0_3px_rgba(224,169,42,0.35)]' : 'border-[#d9c7a6]'}`}>
+    <div className={`w-[min(300px,calc(100vw-1.5rem))] rounded-2xl dh-paper border shadow-lg text-[#2a1d14] transition-shadow ${flash ? 'border-[#e0a92a] shadow-[0_0_0_3px_rgba(224,169,42,0.35)]' : 'border-[#211a15]'}`}>
       <button onClick={toggle} className="w-full flex items-center gap-2 px-3 py-2 cursor-pointer text-left" aria-expanded={open}>
         <Compass className="w-4 h-4 text-[#8e1b1b] shrink-0" />
         <span className="text-[13px] font-semibold truncate">{goal.title}</span>
@@ -110,9 +110,19 @@ export const Tracker: React.FC<{ getDistance: () => number | null; isNight: bool
               <p className="text-[13px] leading-snug">Every secret of Phủ Vân Thủy is yours. The grounds are quiet and grateful.</p>
             )}
           </div>
-          <button onClick={onOpenTrail} className="text-[12px] font-semibold text-[#8e1b1b] underline underline-offset-2 cursor-pointer">
-            Open the secret trail
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button onClick={() => onGuide('story')} className="px-2.5 py-1 dh-seal rounded text-[12px] font-semibold cursor-pointer" title="The firefly shows you where to go (G)">
+              ✦ Guide me <kbd className="hidden pointer-fine:inline ml-0.5 px-1 rounded border border-[#f3ead6]/50 text-[10px] font-sans">G</kbd>
+            </button>
+            {secret && (secret.trigger !== 'night' || isNight) && (
+              <button onClick={() => onGuide('secret')} className="px-2.5 py-1 rounded border-2 border-[#211a15] text-[12px] font-semibold cursor-pointer hover:bg-[#efe3c8]" title="Follow the firefly to the secret">
+                Show the secret
+              </button>
+            )}
+            <button onClick={onOpenTrail} className="text-[12px] font-semibold text-[#8e1b1b] underline underline-offset-2 cursor-pointer">
+              Trail
+            </button>
+          </div>
         </div>
       )}
     </div>

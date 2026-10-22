@@ -9,6 +9,7 @@ import { VietKit } from './kit/vietnam';
 import { phuVanThuy } from './world/phuVanThuy';
 import type { GroundFn, LayoutCtx, LayoutResult, ParticleKind, SecretDef, Etiquette, SpotDef } from './world/types';
 import type { EncounterDef, EncounterEvent, EncounterRuntime, StoryCard, EncounterApi } from './encounters/types';
+import { Firefly, Visitors, Arrival } from './living';
 
 export type TimeOfDay = 'day' | 'twilight' | 'night';
 
@@ -30,6 +31,10 @@ export interface SceneCallbacks {
   onSpotClick?: (spotId: string) => void;
   /** PC: the place marker under the crosshair changed */
   onAim?: (spotId: string | null) => void;
+  /** the boat has reached the landing */
+  onArrivalEnd?: () => void;
+  /** the firefly reached the place it was showing */
+  onGuideArrive?: () => void;
 }
 
 const POCKET_Y = -600;
@@ -348,6 +353,10 @@ export class TempleScene {
     }
     this.spots = res.spots;
     this.buildMarkers();
+    this.firefly = new Firefly(this.ground);
+    this.firefly.onArrive = () => this.callbacks.onGuideArrive?.();
+    this.firefly.attach(this.scene, this.playerPosition.clone().add(new THREE.Vector3(-1, 0, -1)));
+    this.visitors = new Visitors(this.scene, this.ground);
     this.bellObj = this.scene.getObjectByName('bell') ?? null;
     this.createParticles(this.particleKind);
     this.playerPosition.set(res.spawn.x, 1.7 + this.ground(res.spawn.x, res.spawn.z), res.spawn.z);
@@ -554,6 +563,11 @@ export class TempleScene {
   }
 
   private onKeyDown = (e: KeyboardEvent) => {
+    if (this.arriving && (e.code === 'Space' || e.code === 'Enter')) {
+      e.preventDefault();
+      this.skipArrival();
+      return;
+    }
     const t = e.target as HTMLElement | null;
     if (!this._input || (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable))) return;
     if (e.code.startsWith('Arrow')) e.preventDefault();
@@ -765,6 +779,7 @@ export class TempleScene {
     this.updateLanterns(delta);
     this.updateShimmer();
     this.updateMarkers();
+    this.updateLiving(delta);
     if (this.nature) {
       const t = now / 1000;
       this.nature.animated.forEach((a) => a.update(t));
@@ -788,6 +803,11 @@ export class TempleScene {
    * Update Player Movement & Camera Position
    */
   private updatePlayerMovement(delta: number) {
+    if (this.arrival && !this.arrival.done) {
+      this.arrival.update(delta, this.camera, this.arrivalLook);
+      if (this.arrival.done) this.finishArrival();
+      return;
+    }
     if (this.isCinematicMode && !this.enc) {
       // Cinematic auto-tour orbit
       this.cinematicTime += delta * 0.25;
@@ -1249,6 +1269,42 @@ export class TempleScene {
     }
   }
 
+  /* ---------------- the living temple ---------------- */
+  private firefly: Firefly | null = null;
+  private visitors: Visitors | null = null;
+  private arrival: Arrival | null = null;
+  private arrivalLook = new THREE.Vector3();
+  public get arriving() {
+    return !!this.arrival && !this.arrival.done;
+  }
+  /** open on a boat drifting up the river to the landing */
+  public playArrival() {
+    this.arrival = new Arrival(this.scene);
+  }
+  public skipArrival() {
+    if (this.arriving) this.fadeTo(0x000000, 1, 0.3, () => this.finishArrival(true));
+  }
+  private finishArrival(fadeBack = false) {
+    if (!this.arrival) return;
+    this.arrival.done = true;
+    this.playerPosition.set(0, 1.7 + this.ground(0, 64), 64);
+    this.playerRotationY = 0;
+    this.playerPitch = 0;
+    if (fadeBack) this.fadeTo(0x000000, 0, 0.6);
+    this.callbacks.onArrivalEnd?.();
+  }
+  /** the firefly flies ahead to (x, z) */
+  public guideTo(x: number, z: number) {
+    this.firefly?.guide(x, z);
+  }
+  private updateLiving(dt: number) {
+    const t = this.elapsed;
+    const outside = !this.enc;
+    this.firefly?.update(dt, t, this.playerPosition, this.playerRotationY, outside && !this.arriving && !this.isCinematicMode);
+    this.visitors?.update(dt, t, this.playerPosition, outside);
+    if (this.arrival?.done) this.arrival.leave(dt);
+  }
+
   /* ---------------- the secret trail ---------------- */
   private activeSecret: string | null = null;
   private shimmer: THREE.Group | null = null;
@@ -1356,7 +1412,7 @@ export class TempleScene {
   private updateMarkers() {
     for (const m of this.markers) {
       const d = Math.hypot(this.playerPosition.x - m.g.position.x, this.playerPosition.z - m.g.position.z);
-      const show = !this.enc && !this.isCinematicMode && d > 3.8 && d < 20;
+      const show = !this.enc && !this.isCinematicMode && !this.arriving && d > 3.8 && d < 20;
       m.g.visible = show;
       if (!show) continue;
       m.g.position.y = m.baseY + Math.sin(this.elapsed * 2 + m.g.position.x) * 0.08;

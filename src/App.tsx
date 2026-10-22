@@ -37,6 +37,9 @@ const PROMPT: Record<string, string> = {
   theatre: 'Watch the legend of the Mothers',
 };
 
+/** the boat brings you only once per visit to the page */
+let arrivedThisVisit = false;
+
 export default function App() {
   const [view, setView] = useState<'landing' | 'temple'>(() => (new URLSearchParams(location.search).has('enter') ? 'temple' : 'landing'));
   const story = useStory();
@@ -65,6 +68,7 @@ export default function App() {
   });
   const [unlocked, setUnlocked] = useState(false);
   const [aim, setAim] = useState<string | null>(null);
+  const [arriving, setArriving] = useState(false);
   const isPc = typeof window !== 'undefined' && window.matchMedia?.('(pointer: fine)').matches;
   const mount = useRef<HTMLDivElement>(null);
   const scene = useRef<TempleScene | null>(null);
@@ -98,6 +102,11 @@ export default function App() {
       onReady: () => setLoading(false),
       onSpotClick: (id) => spotClick.current(id),
       onAim: setAim,
+      onArrivalEnd: () => {
+        arrivedThisVisit = true;
+        setArriving(false);
+      },
+      onGuideArrive: () => showCaption('The firefly hovers here, waiting for you.', 3),
       canEnter: () => (storyService.get().started ? true : 'Something holds you back. Perhaps speak with the temple keeper first, by the incense burner.'),
       onEncounter: (e) => {
         if (e.type === 'start') {
@@ -123,6 +132,11 @@ export default function App() {
         }
       },
     });
+    if (!arrivedThisVisit) {
+      s.playArrival();
+      setArriving(true);
+    }
+    soundService.setMood(time);
     const veil = window.setTimeout(() => setLoading(false), 9000); // never trap anyone behind the veil
     s.setTimeOfDay(time);
     s.onPointerLockChange = setLocked;
@@ -187,9 +201,9 @@ export default function App() {
     return s && !s.inRealm ? { x: s.playerPosition.x, z: s.playerPosition.z, rotY: s.playerRotationY } : null;
   }, []);
 
-  useBackLayer(view === 'temple' && tips && !loading, () => closeTips());
+  useBackLayer(view === 'temple' && tips && !loading && !arriving, () => closeTips());
   useEffect(() => {
-    if (!tips || loading || view !== 'temple') return;
+    if (!tips || loading || arriving || view !== 'temple') return;
     const k = (e: KeyboardEvent) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
@@ -199,6 +213,7 @@ export default function App() {
     window.addEventListener('keydown', k);
     return () => window.removeEventListener('keydown', k);
   });
+  useBackLayer(view === 'temple' && arriving, () => scene.current?.skipArrival());
   // Back / Esc: leave a realm first, then the temple itself
   useBackLayer(view === 'temple', () => setView('landing'));
   useBackLayer(inRealm, () => scene.current?.leaveLegend());
@@ -229,6 +244,7 @@ export default function App() {
       if (document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement) return;
       if ((e.key === 'e' || e.key === 'E' || e.key === 'Enter') && near && !modal && !card && !inRealm) openRitual(near.type);
       else if ((e.key === 'f' || e.key === 'F') && !modal && !card && !inRealm) setModal('film');
+      else if ((e.key === 'g' || e.key === 'G') && !modal && !card && !inRealm && !arriving) guide();
       else if ((e.key === 'j' || e.key === 'J') && !modal) openJournal();
       else if ((e.key === 't' || e.key === 'T') && !modal) openJournal('trail');
       else if ((e.key === 'm' || e.key === 'M') && !modal) setSettings((st) => ({ ...st, minimap: !st.minimap }));
@@ -250,7 +266,25 @@ export default function App() {
     scene.current?.travelToSpot(id, () => spot.type !== 'view' && spot.type !== 'gate' && window.setTimeout(() => openRitual(spot.type), 450));
   };
 
+  // the firefly guide: to the story's next step, or to the current secret
+  const guide = (what: 'story' | 'secret' = 'story') => {
+    const st = storyService.get();
+    const sec = nextSecret(luckService.get().found);
+    const spotAt = (id: string) => spots.find((x) => x.id === id)?.at ?? null;
+    let at: [number, number] | null = null;
+    if (what === 'secret' && sec) at = sec.at;
+    else if (!st.started || (st.khan.length === 4 && !st.ceremony)) at = spotAt('keeper');
+    else if (st.khan.length < 4) {
+      const p = PALACES.find((x) => !st.khan.includes(x.id))!;
+      at = spotAt({ thien: 'bell', 'thuong-ngan': 'grotto', thoai: 'pond', dia: 'banyan' }[p.id] ?? 'keeper');
+    } else if (sec) at = sec.at;
+    if (!at) return showCaption('The firefly circles you happily. Nothing left to find… for now.', 4);
+    scene.current?.guideTo(at[0], at[1]);
+    showCaption('The firefly darts ahead. Follow its light.', 3);
+  };
+
   const changeTime = (t: TimeOfDay) => {
+    soundService.setMood(t);
     setTime(t);
     scene.current?.setTimeOfDay(t);
   };
@@ -279,15 +313,15 @@ export default function App() {
       <div className="fixed top-[max(0.75rem,env(safe-area-inset-top))] left-3 z-30 flex items-center gap-2">
         <button
           onClick={() => (inRealm ? scene.current?.leaveLegend() : setView('landing'))}
-          className="flex items-center gap-1.5 pl-2.5 pr-3.5 py-2 rounded-xl bg-[#fbf3e2]/95 border border-[#d9c7a6] text-[#2a1d14] text-xs font-semibold shadow-md cursor-pointer hover:border-[#8e1b1b]"
+          className="flex items-center gap-1.5 pl-2.5 pr-3.5 py-2 rounded-xl dh-paper border border-[#211a15] text-[#2a1d14] text-xs font-semibold shadow-md cursor-pointer hover:border-[#8e1b1b]"
           aria-label={inRealm ? 'Back to the temple' : 'Leave the temple'}
           title={inRealm ? 'Back to the temple (Esc)' : 'Leave (Esc)'}
         >
           <ArrowLeft className="w-4 h-4 text-[#8e1b1b]" />
           <span>{inRealm ? 'Temple' : 'Leave'}</span>
-          <kbd className="hidden pointer-fine:inline ml-1 px-1 rounded border border-[#d9c7a6] text-[10px] text-[#6d5b49] font-sans">Esc</kbd>
+          <kbd className="hidden pointer-fine:inline ml-1 px-1 rounded border border-[#211a15] text-[10px] text-[#6d5b49] font-sans">Esc</kbd>
         </button>
-        <div className="hidden min-[520px]:flex items-center gap-2 px-3 py-2 rounded-xl bg-[#fbf3e2]/95 border border-[#d9c7a6] shadow-md text-xs">
+        <div className="hidden min-[520px]:flex items-center gap-2 px-3 py-2 rounded-xl dh-paper border border-[#211a15] shadow-md text-xs">
           <span className="text-[#4a3826] font-semibold">Phủ Vân Thủy</span>
         </div>
       </div>
@@ -295,7 +329,7 @@ export default function App() {
       {/* top-right: phúc, scarves, journal, sound */}
       <div className="fixed top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-30 flex items-center gap-1.5 sm:gap-2">
         <LuckChip onClick={() => setShowPhuc(true)} compact />
-        <button onClick={() => openJournal()} className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-xl bg-[#fbf3e2]/95 border border-[#d9c7a6] shadow-md cursor-pointer hover:border-[#8e1b1b]" aria-label={`Journal: ${story.khan.length} of 4 scarves`}>
+        <button onClick={() => openJournal()} className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-xl dh-paper border border-[#211a15] shadow-md cursor-pointer hover:border-[#8e1b1b]" aria-label={`Journal: ${story.khan.length} of 4 scarves`}>
           <span className="flex -space-x-2.5">
             {PALACES.map((p) => (
               <KhanArt key={p.id} color={p.color} size={24} dim={!story.khan.includes(p.id)} />
@@ -304,10 +338,10 @@ export default function App() {
           <span className="text-xs font-bold tabular-nums text-[#4a3826]">{story.khan.length}/4</span>
           <BookOpen className="w-4 h-4 text-[#8e1b1b] hidden sm:block" />
         </button>
-        <button onClick={() => setModal('controls')} className="hidden pointer-fine:flex p-2 rounded-xl bg-[#fbf3e2]/95 border border-[#d9c7a6] shadow-md cursor-pointer" aria-label="Controls" title="Controls (?)">
+        <button onClick={() => setModal('controls')} className="hidden pointer-fine:flex p-2 rounded-xl dh-paper border border-[#211a15] shadow-md cursor-pointer" aria-label="Controls" title="Controls (?)">
           <Keyboard className="w-4 h-4 text-[#4a3826]" />
         </button>
-        <button onClick={() => setModal('settings')} className="p-2 rounded-xl bg-[#fbf3e2]/95 border border-[#d9c7a6] shadow-md cursor-pointer" aria-label="Settings" title="Settings">
+        <button onClick={() => setModal('settings')} className="p-2 rounded-xl dh-paper border border-[#211a15] shadow-md cursor-pointer" aria-label="Settings" title="Settings">
           <Gear className="w-4 h-4 text-[#4a3826]" />
         </button>
         <button
@@ -316,7 +350,7 @@ export default function App() {
             setMuted(m);
             soundService.setMuted(m);
           }}
-          className="p-2 rounded-xl bg-[#fbf3e2]/95 border border-[#d9c7a6] shadow-md cursor-pointer"
+          className="p-2 rounded-xl dh-paper border border-[#211a15] shadow-md cursor-pointer"
           aria-label={muted ? 'Sound on' : 'Sound off'}
         >
           {muted ? <VolumeX className="w-4 h-4 text-[#8a7762]" /> : <Volume2 className="w-4 h-4 text-[#8e1b1b]" />}
@@ -324,9 +358,27 @@ export default function App() {
       </div>
 
       {/* objective tracker: story goal + the current secret's riddle */}
-      {!inRealm && !loading && (
+      {!inRealm && !loading && !arriving && (
         <div className={`fixed left-3 top-[calc(max(0.75rem,env(safe-area-inset-top))+3rem)] z-20 ${modal ? 'hidden sm:block' : ''}`}>
-          <Tracker getDistance={getSecretDistance} isNight={time === 'night'} onOpenTrail={() => openJournal('trail')} />
+          <Tracker getDistance={getSecretDistance} isNight={time === 'night'} onOpenTrail={() => openJournal('trail')} onGuide={guide} />
+        </div>
+      )}
+
+      {/* arrival by boat: letterbox, a printed title, skip */}
+      {arriving && (
+        <div className="fixed inset-0 z-40 pointer-events-none">
+          <div className="absolute inset-x-0 top-0 h-[11vh] bg-black arrive-bar-top" />
+          <div className="absolute inset-x-0 bottom-0 h-[14vh] bg-black arrive-bar-bottom" />
+          <div className="absolute left-1/2 bottom-[17vh] -translate-x-1/2 arrive-title text-center">
+            <div className="dh-paper px-8 py-4 rounded-sm">
+              <div className="text-[11px] uppercase tracking-[0.3em] text-[#8f2a21] font-semibold">Phủ thờ Mẫu</div>
+              <div className="dh-title text-3xl sm:text-4xl text-[#211a15] mt-1">Phủ Vân Thủy</div>
+              <div className="font-display italic text-sm text-[#4a3826] mt-1">Dusk, on a river bend beneath the mountains</div>
+            </div>
+          </div>
+          <button onClick={() => scene.current?.skipArrival()} className="pointer-events-auto absolute right-4 bottom-[3.5vh] px-3 py-1.5 rounded text-[13px] text-[#fbeed2] border border-white/30 hover:bg-white/10 cursor-pointer">
+            Skip <kbd className="hidden pointer-fine:inline ml-1 px-1 rounded border border-white/30 text-[10px] font-sans">Space</kbd>
+          </button>
         </div>
       )}
 
@@ -340,9 +392,9 @@ export default function App() {
       )}
 
       {/* first visit: how to move */}
-      {tips && !loading && !inRealm && !modal && (
+      {tips && !loading && !arriving && !inRealm && !modal && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-[#2a1410]/55 backdrop-blur-[2px] p-4" onClick={closeTips}>
-          <div className="w-[min(420px,100%)] rounded-3xl bg-[#fbf3e2] border border-[#d9c7a6] shadow-2xl p-5 text-[#2a1d14]" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="How to explore">
+          <div className="w-[min(420px,100%)] rounded-lg dh-paper p-5 text-[#2a1d14]" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="How to explore">
             <div className="text-xs uppercase tracking-[0.18em] text-[#8e1b1b] font-semibold text-center">Chào mừng</div>
             <h2 className="mt-1 text-xl font-display font-bold text-center">How to explore</h2>
             <ul className="mt-4 space-y-2.5 text-[14px]">
@@ -378,7 +430,7 @@ export default function App() {
       )}
 
       {/* PC: minimap under the top bar, crosshair while the mouse is captured, key hints */}
-      {!inRealm && settings.minimap && spots.length > 0 && (
+      {!inRealm && !arriving && settings.minimap && spots.length > 0 && (
         <div className="hidden lg:block fixed right-3 top-16 z-20">
           <Minimap spots={spots} getPlayer={getPlayer} onGo={(id) => scene.current?.teleportToSpot(id)} near={near?.id} />
         </div>
@@ -396,7 +448,7 @@ export default function App() {
         </div>
       )}
 
-      {!inRealm && (
+      {!inRealm && !arriving && (
         <Dock
           spots={spots}
           time={time}
@@ -420,7 +472,7 @@ export default function App() {
           {near && !modal && PROMPT[near.type] && (
             <button
               onClick={() => openRitual(near.type)}
-              className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#8e1b1b] to-[#b4301f] text-[#fff4dc] font-semibold text-sm border border-[#e9b84a]/60 shadow-2xl cursor-pointer hover:scale-[1.03] active:scale-95 transition-transform"
+              className="px-5 py-2.5 rounded-md dh-seal font-semibold text-sm cursor-pointer hover:scale-[1.03] active:scale-95 transition-transform"
             >
               <span className="pointer-coarse:hidden opacity-80">[E] </span>
               {PROMPT[near.type]}

@@ -50,13 +50,13 @@ export const Dock: React.FC<Props> = ({ spots, time, onTime, auto, onAuto, tour,
       style={{ left: '50%', transform: 'translateX(-50%)', width: 'max-content', maxWidth: 'calc(100vw - 1.5rem)' }}
     >
       <div className="pointer-events-auto">{children}</div>
-      <button onClick={() => setOpen(!open)} className="pointer-events-auto flex items-center gap-1 px-3 py-1 rounded-t-xl bg-[#fbf3e2]/95 border border-b-0 border-[#d9c7a6] text-xs font-semibold text-[#4a3826] cursor-pointer" aria-expanded={open}>
+      <button onClick={() => setOpen(!open)} className="pointer-events-auto flex items-center gap-1 px-3 py-1 rounded-t-xl dh-paper border border-b-0 border-[#211a15] text-xs font-semibold text-[#4a3826] cursor-pointer" aria-expanded={open}>
         {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
         {open ? 'Hide' : 'Show controls'}
-        <kbd className="hidden pointer-fine:inline ml-1 px-1 rounded border border-[#d9c7a6] text-[10px] font-sans">H</kbd>
+        <kbd className="hidden pointer-fine:inline ml-1 px-1 rounded border border-[#211a15] text-[10px] font-sans">H</kbd>
       </button>
       {open && (
-        <div className="pointer-events-auto -mt-2 w-[min(940px,calc(100vw-1.5rem))] rounded-2xl bg-[#fbf3e2]/95 backdrop-blur-md border border-[#d9c7a6] shadow-[0_10px_40px_rgba(42,20,16,0.35)] p-2 sm:p-2.5">
+        <div className="pointer-events-auto -mt-2 w-[min(940px,calc(100vw-1.5rem))] rounded-2xl dh-paper border border-[#211a15] shadow-[0_10px_40px_rgba(42,20,16,0.35)] p-2 sm:p-2.5">
           <div className="flex items-center gap-2">
             <div className="flex p-0.5 rounded-xl bg-[#efe3cb]" role="tablist">
               {(

@@ -139,7 +139,7 @@ export const Minimap: React.FC<{ spots: SpotDef[]; getPlayer: () => { x: number;
   const { HALL, POND, BANYAN, GROTTO, BELL, GATE_Z } = WORLD;
   const inMap = p && p.x > X0 && p.x < X1 && p.z > Z0 && p.z < Z1;
   return (
-    <div className="rounded-2xl bg-[#fbf3e2]/92 backdrop-blur-md border border-[#d9c7a6] shadow-lg p-2" aria-label="Minimap">
+    <div className="rounded-2xl dh-paper border border-[#211a15] shadow-lg p-2" aria-label="Minimap">
       <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="block">
         <rect width={W} height={H} rx="10" fill="#cfd8b0" />
         {/* river */}

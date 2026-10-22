@@ -78,11 +78,11 @@ export const Sheet: React.FC<SheetProps> = ({
       <div className="absolute inset-0 bg-[#2c241c]/45 backdrop-blur-[2px] sheet-fade" onClick={onClose} />
 
       <div
-        className={`sheet-panel relative w-full ${WIDTH[size]} flex flex-col max-h-[92dvh] sm:max-h-[88vh] bg-[#fbf7ef] text-[#2c241c] border border-[#e0d2bb] rounded-t-3xl sm:rounded-2xl shadow-[0_-8px_40px_rgba(44,36,28,0.25)] sm:shadow-[0_20px_60px_rgba(44,36,28,0.3)] overflow-hidden ${cardClassName}`}
+        className={`sheet-panel relative w-full ${WIDTH[size]} flex flex-col max-h-[92dvh] sm:max-h-[88vh] dh-paper rounded-t-2xl sm:rounded-lg shadow-[0_-8px_40px_rgba(44,36,28,0.25)] sm:shadow-[0_20px_60px_rgba(44,36,28,0.3)] overflow-hidden ${cardClassName}`}
         style={dragY ? { transform: `translateY(${dragY}px)`, transition: 'none' } : undefined}
       >
         {/* Vermilion hairline (PC) / grab handle (phone) */}
-        <div className="hidden sm:block absolute top-0 inset-x-0 h-1 bg-[#b91c1c]" />
+        <div className="hidden sm:block absolute top-4 left-4 w-3.5 h-3.5 bg-[#b8382b] border-2 border-[#211a15] rotate-45" aria-hidden />
         <div
           className="sm:hidden shrink-0 flex justify-center pt-2.5 pb-1 touch-none cursor-grab"
           onTouchStart={onTouchStart}

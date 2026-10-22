@@ -39,6 +39,8 @@ voice in English or Vietnamese (where a Vietnamese voice is installed), with bil
 **Floating lanterns.** At the river landing you can set a lotus lantern (đèn hoa đăng) on the water with a wish,
 and watch it drift away. Lovelier at night.
 
+**Living temple.** You arrive by boat up the misty river (Space skips). A firefly drifts beside you: press G (or "Guide me") and it flies ahead to your next step or the current secret. Other visitors walk the grounds and pray; the soundscape follows the time of day.
+
 **Navigation.** Esc, the browser back button and Android's back gesture always step back one level.
 
 ## Run
