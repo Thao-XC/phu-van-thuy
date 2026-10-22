@@ -357,6 +357,10 @@ export class Ceremony {
   private energy = 0;
   /** someone is sitting on the mat and keeping the beat */
   watching = false;
+  /** someone is inside the medium: the body is hidden and the camera wears it */
+  possessed = false;
+  /** the medium has felt a touch: it stops, and turns to look at whoever touched it */
+  private stare: { at: THREE.Vector3; t: number } | null = null;
   private watchGia = 0;
   private beatPulse = 0;
 
@@ -525,13 +529,37 @@ export class Ceremony {
     this.bursts.push({ m, t: 0 });
     this.beatPulse = 1;
   }
+  /** did this ray touch the medium? */
+  hit(ray: THREE.Raycaster) {
+    return !this.possessed && ray.intersectObject(this.body, true).length > 0;
+  }
+  /** where the medium's eyes are */
+  head(out = new THREE.Vector3()) {
+    return out.set(this.medium.position.x, this.medium.position.y + 1.5, this.medium.position.z);
+  }
+  get currentLook() {
+    return this.look;
+  }
+  /** stop dancing and turn the veiled head toward someone, for a few seconds */
+  stareAt(p: THREE.Vector3, sec = 4) {
+    this.stare = { at: p.clone(), t: sec };
+  }
+  setPossessed(on: boolean) {
+    this.possessed = on;
+    this.medium.visible = !on;
+    // from inside, the aura column would wrap the whole view
+    this.column.visible = !on;
+  }
   /** at the end the spirits scatter lộc over everyone */
-  scatterLoc() {
-    for (let i = 0; i < 26; i++) {
+  scatterLoc(n = 26, dir?: THREE.Vector3) {
+    for (let i = 0; i < n; i++) {
       const m = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 0.18), new THREE.MeshStandardMaterial({ color: 0xc81e1e, side: THREE.DoubleSide, emissive: 0x3a0800 }));
       m.position.set(this.medium.position.x, this.y0 + 1.5, -11);
       this.g.add(m);
-      this.loc.push({ m, v: new THREE.Vector3((Math.random() - 0.5) * 3, 3 + Math.random() * 2, 2 + Math.random() * 3), t: 0 });
+      const v = dir
+        ? dir.clone().multiplyScalar(2.5 + Math.random() * 2.5).add(new THREE.Vector3((Math.random() - 0.5) * 2, 2.5 + Math.random() * 2, (Math.random() - 0.5) * 2))
+        : new THREE.Vector3((Math.random() - 0.5) * 3, 3 + Math.random() * 2, 2 + Math.random() * 3);
+      this.loc.push({ m, v, t: 0 });
     }
   }
   /** while someone watches, the app chooses the spirit; otherwise they change every half minute */
@@ -541,7 +569,18 @@ export class Ceremony {
   }
 
   update(t: number, dt = 1 / 60) {
-    if (!this.watching) {
+    if (this.stare) {
+      // frozen, facing you; the veil breathes
+      this.stare.t -= dt;
+      const m = this.medium;
+      const want = Math.atan2(this.stare.at.x - m.position.x, this.stare.at.z - m.position.z);
+      m.rotation.y += Math.atan2(Math.sin(want - m.rotation.y), Math.cos(want - m.rotation.y)) * Math.min(1, dt * 5);
+      this.body.rotation.x = -0.06 + Math.sin(t * 9) * 0.008;
+      this.arms.forEach((a, i) => a.rotation.set(-0.15, 0, (i ? 1 : -1) * 0.12));
+      if (this.stare.t <= 0) this.stare = null;
+      return;
+    }
+    if (!this.watching && !this.possessed) {
       const gi = Math.floor(t / 30) % AMBIENT_GIA.length;
       if (AMBIENT_GIA[gi] !== this.look) this.apply(AMBIENT_GIA[gi]);
       this.energy = 0.35 + Math.sin(t * 0.7) * 0.1;

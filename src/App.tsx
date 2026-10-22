@@ -16,6 +16,7 @@ import { SECRETS, nextSecret } from './data/story';
 import { AltarModal, PetitionModal, StallModal, XamSlip, drawXam } from './components/Rituals';
 import { IncenseRitual, XamRitual } from './components/RitualStage';
 import { HauDongSight, type CeremonyControl } from './components/HauDongSight';
+import { PossessionVeil, createPossessBus } from './components/PossessionVeil';
 import { daySchedule, hauDongState, fmtHour, hourOf } from './services/templeDay';
 import { KhanArt } from './components/LocArt';
 import { LuckChip, LuckToasts, CaptionBar, StoryCardSheet, LuckSheet } from './components/LuckAndLegends';
@@ -72,6 +73,10 @@ export default function App() {
   const rung = useRef('');
   const [watchCtl, setWatchCtl] = useState<CeremonyControl | null>(null);
   const [gaze, setGaze] = useState(0);
+  // thanh đồng: inside the medium
+  const possessBus = useMemo(() => createPossessBus(), []);
+  const [possessing, setPossessing] = useState(false);
+  const [touchWarn, setTouchWarn] = useState(0);
   // first-person rites
   const [rite, setRite] = useState<string | null>(null);
   const [riteHint, setRiteHint] = useState<string | null>(null);
@@ -129,6 +134,26 @@ export default function App() {
       },
       onReady: () => setLoading(false),
       onGaze: setGaze,
+      onPossess: (e) => {
+        if (e.type === 'touch') {
+          setTouchWarn((n) => n + 1);
+          return;
+        }
+        if (e.type === 'phase' && e.phase === 'taken') {
+          setPossessing(true);
+          setWatchCtl(null);
+          setModal((m) => (m === 'haudong' ? null : m));
+        }
+        if (e.type === 'phase' && e.phase === 'done') {
+          window.setTimeout(() => setPossessing(false), 3800);
+          try {
+            localStorage.setItem('pvt_chosen', String(Number(localStorage.getItem('pvt_chosen') || 0) + 1));
+          } catch {
+            /* ignore */
+          }
+        }
+        possessBus.emit(e);
+      },
       onRiteHint: setRiteHint,
       onRiteDone: (r) => riteDone.current(r),
       onVision: () => {
@@ -340,6 +365,7 @@ export default function App() {
   // Back / Esc: leave a realm first, then the temple itself
   useBackLayer(view === 'temple', () => setView('landing'));
   useBackLayer(inRealm, () => scene.current?.leaveLegend());
+  useBackLayer(possessing, () => scene.current?.skipPossession());
 
   /* ---------------- interactions ---------------- */
   const ringBell = () => {
@@ -377,7 +403,7 @@ export default function App() {
   useEffect(() => {
     if (view !== 'temple') return;
     const onKey = (e: KeyboardEvent) => {
-      if (rite) return;
+      if (rite || possessing) return;
       if (document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement) return;
       if ((e.key === 'e' || e.key === 'E' || e.key === 'Enter' || e.key === ' ') && near && !modal && !card && !inRealm && !arriving) {
         e.preventDefault();
@@ -545,6 +571,13 @@ export default function App() {
           }}
         />
       )}
+      {possessing && <PossessionVeil bus={possessBus} />}
+      {touchWarn > 0 && !possessing && (
+        <div key={touchWarn} className="fixed inset-x-0 top-[40%] z-[46] text-center pointer-events-none touch-warn">
+          <div className="font-display italic text-xl sm:text-2xl text-[#f0c9a8] [text-shadow:0_0_14px_#000]">…đừng chạm…</div>
+          <div className="font-display italic text-sm text-[#d9b89a]/80 [text-shadow:0_0_8px_#000]">…do not touch…</div>
+        </div>
+      )}
       {vision && (
         <div className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none vision-in">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(255,200,120,.55),rgba(90,8,8,.85)_60%,rgba(0,0,0,.95))]" />
@@ -556,7 +589,7 @@ export default function App() {
       )}
 
       {/* top-left: back, place */}
-      <div className={`fixed top-[max(0.75rem,env(safe-area-inset-top))] left-3 z-30 flex items-center gap-2 ${modal === 'haudong' ? 'hidden' : ''}`}>
+      <div className={`fixed top-[max(0.75rem,env(safe-area-inset-top))] left-3 z-30 flex items-center gap-2 ${modal === 'haudong' || possessing ? 'hidden' : ''}`}>
         <button
           onClick={() => (inRealm ? scene.current?.leaveLegend() : setView('landing'))}
           className="flex items-center gap-1.5 pl-2.5 pr-3.5 py-2 rounded-xl dh-paper border border-[#211a15] text-[#2a1d14] text-xs font-semibold shadow-md cursor-pointer hover:border-[#8e1b1b]"
@@ -574,7 +607,7 @@ export default function App() {
       </div>
 
       {/* top-right: phúc, scarves, journal, sound */}
-      <div className={`fixed top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-30 flex items-center gap-1.5 sm:gap-2 ${modal === 'haudong' ? 'hidden' : ''}`}>
+      <div className={`fixed top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-30 flex items-center gap-1.5 sm:gap-2 ${modal === 'haudong' || possessing ? 'hidden' : ''}`}>
         <CalendarChip now={cal.now} lunar={cal.lunar} festival={cal.festival} onClick={() => setModal('calendar')} />
         <LuckChip onClick={() => setShowPhuc(true)} compact />
         <button onClick={() => openJournal()} className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-xl dh-paper border border-[#211a15] shadow-md cursor-pointer hover:border-[#8e1b1b]" aria-label={`Journal: ${story.khan.length} of 4 scarves`}>
@@ -606,7 +639,7 @@ export default function App() {
       </div>
 
       {/* objective tracker: story goal + the current secret's riddle */}
-      {!inRealm && !loading && !arriving && modal !== 'haudong' && !rite && (
+      {!inRealm && !loading && !arriving && modal !== 'haudong' && !rite && !possessing && (
         <div className={`fixed left-3 top-[calc(max(0.75rem,env(safe-area-inset-top))+3rem)] z-20 ${modal ? 'hidden sm:block' : ''}`}>
           <Tracker getDistance={getSecretDistance} isNight={time === 'night'} onOpenTrail={() => openJournal('trail')} onGuide={guide} />
         </div>
@@ -717,7 +750,7 @@ export default function App() {
       )}
 
       {/* PC: minimap under the top bar, crosshair while the mouse is captured, key hints */}
-      {!inRealm && !arriving && modal !== 'haudong' && settings.minimap && spots.length > 0 && (
+      {!inRealm && !arriving && modal !== 'haudong' && !possessing && settings.minimap && spots.length > 0 && (
         <div className="hidden lg:block fixed right-3 top-16 z-20">
           <Minimap spots={spots} getPlayer={getPlayer} onGo={(id) => scene.current?.teleportToSpot(id)} near={near?.id} />
         </div>
@@ -735,7 +768,7 @@ export default function App() {
         </div>
       )}
 
-      {!inRealm && !arriving && modal !== 'haudong' && !rite && (
+      {!inRealm && !arriving && modal !== 'haudong' && !rite && !possessing && (
         <Dock
           spots={spots}
           time={time}
@@ -805,6 +838,7 @@ export default function App() {
       {modal === 'haudong' && watchCtl && (
         <HauDongSight
           ctl={watchCtl}
+          onTouch={(x, y) => !!scene.current?.touchMedium(x, y)}
           onClose={() => {
             scene.current?.stopWatching();
             setWatchCtl(null);

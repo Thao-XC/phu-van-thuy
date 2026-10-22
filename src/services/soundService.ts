@@ -640,6 +640,169 @@ class SoundService {
     this.tone(freq, at, 0.25, 0.05, 'sine', freq * 1.01);
   }
 
+  /* ---------------- inside the medium ---------------- */
+  private pos: { bus: GainNode; lp: BiquadFilterNode; ring: GainNode; ringOsc: OscillatorNode; drone: GainNode; droneOsc: OscillatorNode; timer: number; nextHeart: number; nextDrum: number; nextNote: number; bpm: number; drumBpm: number; note: number } | null = null;
+  /**
+   * Under the veil the world is a room away: the band muffled as if through cloth, your own
+   * heart loud in your ears, a thin ringing, and a drone that is not quite music.
+   */
+  public startPossession() {
+    const ctx = this.initContext();
+    if (!ctx || this.pos) return;
+    const now = ctx.currentTime;
+    const bus = ctx.createGain();
+    bus.gain.value = this.isMuted ? 0 : 1;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 320;
+    lp.Q.value = 0.8;
+    bus.connect(lp);
+    lp.connect(ctx.destination);
+    const ringOsc = ctx.createOscillator();
+    ringOsc.frequency.value = 3520;
+    const ring = ctx.createGain();
+    ring.gain.value = 0;
+    ringOsc.connect(ring);
+    ring.connect(ctx.destination);
+    ringOsc.start();
+    const droneOsc = ctx.createOscillator();
+    droneOsc.type = 'sawtooth';
+    droneOsc.frequency.value = 49;
+    const dlp = ctx.createBiquadFilter();
+    dlp.type = 'lowpass';
+    dlp.frequency.value = 180;
+    const drone = ctx.createGain();
+    drone.gain.value = 0;
+    droneOsc.connect(dlp);
+    dlp.connect(drone);
+    drone.connect(ctx.destination);
+    droneOsc.start();
+    drone.gain.setTargetAtTime(this.isMuted ? 0 : 0.08, now, 1.5);
+    this.pos = { bus, lp, ring, ringOsc, drone, droneOsc, timer: 0, nextHeart: now + 0.4, nextDrum: now + 0.2, nextNote: now + 1, bpm: 128, drumBpm: 76, note: 0 };
+    this.pos.timer = window.setInterval(() => this.posTick(), 100);
+  }
+  /** heart = your pulse (bpm), muffle 0..1 (1 = under the veil), ring = the ringing in the ears */
+  public setPossession(v: { heart?: number; muffle?: number; ring?: number; drone?: number; drum?: number }) {
+    const p = this.pos, ctx = this.ctx;
+    if (!p || !ctx) return;
+    const now = ctx.currentTime;
+    if (v.heart !== undefined) p.bpm = v.heart;
+    if (v.drum !== undefined) p.drumBpm = v.drum;
+    if (v.muffle !== undefined) p.lp.frequency.setTargetAtTime(320 + (1 - v.muffle) * 9000, now, 0.25);
+    if (v.ring !== undefined) p.ring.gain.setTargetAtTime(this.isMuted ? 0 : v.ring * 0.012, now, 0.6);
+    if (v.drone !== undefined) p.drone.gain.setTargetAtTime(this.isMuted ? 0 : v.drone * 0.1, now, 0.8);
+  }
+  private posTone(freq: number, at: number, dur: number, vol: number, type: OscillatorType, bendTo?: number, dest?: AudioNode) {
+    const ctx = this.ctx;
+    if (!ctx || this.isMuted) return;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, at);
+    if (bendTo) o.frequency.exponentialRampToValueAtTime(bendTo, at + dur * 0.6);
+    g.gain.setValueAtTime(0, at);
+    g.gain.linearRampToValueAtTime(vol, at + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    o.connect(g);
+    g.connect(dest ?? ctx.destination);
+    o.start(at);
+    o.stop(at + dur + 0.05);
+  }
+  private posTick() {
+    const p = this.pos, ctx = this.ctx;
+    if (!p || !ctx) return;
+    const now = ctx.currentTime;
+    // your heart: lub-dub, close and dry
+    while (p.nextHeart < now + 0.25) {
+      const t = Math.max(p.nextHeart, now);
+      this.posTone(58, t, 0.22, 0.5, 'sine', 40);
+      this.posTone(52, t + 0.16, 0.2, 0.32, 'sine', 38);
+      p.nextHeart = t + 60 / p.bpm;
+    }
+    // the band, heard through cloth
+    while (p.nextDrum < now + 0.25) {
+      const t = Math.max(p.nextDrum, now);
+      this.posTone(110, t, 0.4, 0.5, 'sine', 66, p.bus);
+      this.posTone(1800, t, 0.05, 0.12, 'square', 1500, p.bus);
+      p.nextDrum = t + 60 / p.drumBpm;
+    }
+    if (p.nextNote < now) {
+      const scale = [261.6, 293.7, 349.2, 392.0, 440.0];
+      const n = [0, 2, 3, 4, 3, 2, 1, 0][p.note++ % 8];
+      this.posTone(scale[n], now, 1.2, 0.18, 'triangle', undefined, p.bus);
+      p.nextNote = now + (60 / p.drumBpm) * (p.note % 4 === 0 ? 2 : 1);
+    }
+  }
+  /** a voice that is breath more than voice, from one side then the other */
+  public whisper(len = 6, pan = 0) {
+    const ctx = this.initContext();
+    if (!ctx || this.isMuted) return;
+    const now = ctx.currentTime;
+    const panner = ctx.createStereoPanner();
+    panner.pan.value = pan;
+    panner.connect(ctx.destination);
+    for (let i = 0; i < len; i++) {
+      const at = now + i * (0.16 + Math.random() * 0.12);
+      const dur = 0.12 + Math.random() * 0.18;
+      const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * dur), ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let j = 0; j < d.length; j++) d[j] = (Math.random() * 2 - 1) * Math.sin((j / d.length) * Math.PI);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      const f = ctx.createBiquadFilter();
+      f.type = 'bandpass';
+      f.Q.value = 6;
+      const f0 = 700 + Math.random() * 1600;
+      f.frequency.setValueAtTime(f0, at);
+      f.frequency.linearRampToValueAtTime(f0 * (0.7 + Math.random() * 0.6), at + dur);
+      const g = ctx.createGain();
+      g.gain.value = 0.55;
+      src.connect(f);
+      f.connect(g);
+      g.connect(panner);
+      src.start(at);
+    }
+  }
+  /** the veil lifts: a long indrawn breath of sound, then the gong */
+  public veilLift() {
+    const ctx = this.initContext();
+    if (!ctx || this.isMuted) return;
+    const now = ctx.currentTime;
+    const buf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const f = ctx.createBiquadFilter();
+    f.type = 'bandpass';
+    f.frequency.setValueAtTime(300, now);
+    f.frequency.exponentialRampToValueAtTime(5000, now + 1.8);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(0.4, now + 1.8);
+    g.gain.linearRampToValueAtTime(0, now + 1.95);
+    src.connect(f);
+    f.connect(g);
+    g.connect(ctx.destination);
+    src.start(now);
+    setTimeout(() => this.playTempleGong(), 1850);
+  }
+  /** everything stops at once */
+  public stopPossession() {
+    const p = this.pos;
+    if (!p) return;
+    clearInterval(p.timer);
+    try {
+      p.ringOsc.stop();
+      p.droneOsc.stop();
+    } catch {
+      /* already stopped */
+    }
+    p.bus.disconnect();
+    p.ring.disconnect();
+    p.drone.disconnect();
+    this.pos = null;
+  }
+
   private chauVanTimer: number | null = null;
   private cvVol = 1;
   /** distant or close: the hầu đồng music fades with distance from the hall */

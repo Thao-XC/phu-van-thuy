@@ -59,6 +59,12 @@ autumn seasons, and all day on great festivals; see the calendar). Kneel on the 
 five spirits in turn, each with their own costume, props, dance and coloured aura; keep the beat with the phách to make
 the aura bloom, or just watch.
 
+**Thanh đồng.** Touch the medium during a hầu đồng and they stop and turn to you. Touch them again and you are inside:
+the red veil over your eyes, the hall dark and muffled, your own heart too loud, shapes with candle eyes gathering round
+the mat and whispering. A voice tells you to breathe with the drum (hold Space or the mouse) and let Her in. Then the veil
+is thrown off, you spin through the spirit's dance and scatter lộc to the shapes, now kneeling, until She leaves all at
+once and you wake on the mat. Nothing can be failed, and Esc wakes you at any time.
+
 **Rituals by hand.** Incense: pick sticks from the vase, hold them in the candle flame, raise and bow three times, plant
 them in the ash. Fortune sticks: shake the tube (drag or ← →) until a stick falls, then ask the coins.
 

@@ -10,6 +10,7 @@ import { phuVanThuy } from './world/phuVanThuy';
 import type { GroundFn, LayoutCtx, LayoutResult, ParticleKind, SecretDef, Etiquette, SpotDef } from './world/types';
 import type { EncounterDef, EncounterEvent, EncounterRuntime, StoryCard, EncounterApi } from './encounters/types';
 import { Firefly, Visitors, Arrival, Ceremony, type GiaLook } from './living';
+import { Possession, type PossessEvent } from './possession';
 import { HallAtmosphere } from './atmosphere';
 import { Hands, Rite, BowRite, IncenseRite, XamRite, type RiteHost } from './fpv';
 import { WORLD } from './world/phuVanThuy';
@@ -39,6 +40,8 @@ export interface SceneCallbacks {
   /** a first-person rite: what to do next (null when it ends) */
   onRiteHint?: (text: string | null) => void;
   onRiteDone?: (r: { kind: string; n?: number }) => void;
+  /** inside the medium: phases, lines that surface, prompts; and the first warning touch */
+  onPossess?: (e: PossessEvent | { type: 'touch' }) => void;
   /** a floating place marker was clicked */
   onSpotClick?: (spotId: string) => void;
   /** PC: the place marker under the crosshair changed */
@@ -589,6 +592,14 @@ export class TempleScene {
   }
 
   private onKeyDown = (e: KeyboardEvent) => {
+    if (this.possession) {
+      if (e.code === 'Escape') this.possession.skip();
+      else if ((e.code === 'Space' || e.code === 'Enter') && !e.repeat) {
+        e.preventDefault();
+        this.possession.press(true);
+      }
+      return;
+    }
     if (this.rite && !this.rite.finished) {
       if (e.repeat) return;
       if (e.code === 'Space' || (e.code === 'Enter' && !(this.rite instanceof IncenseRite))) {
@@ -611,6 +622,7 @@ export class TempleScene {
 
   private onKeyUp = (e: KeyboardEvent) => {
     this.keysPressed[e.code] = false;
+    if (this.possession && (e.code === 'Space' || e.code === 'Enter')) this.possession.press(false);
     if (this.rite && (e.code === 'Space' || e.code === 'Enter')) this.rite.press(false);
   };
 
@@ -669,6 +681,14 @@ export class TempleScene {
   }
 
   private onPointerDown = (e: PointerEvent) => {
+    if (this.possession) {
+      this.possession.press(true);
+      this.isDragging = true;
+      this.previousPointerPos = { x: e.clientX, y: e.clientY };
+      return;
+    }
+    // touching the medium during a hầu đồng
+    if (e.button === 0 && this.touchMedium(this.pointerLocked ? undefined : e.clientX, this.pointerLocked ? undefined : e.clientY)) return;
     if (this.rite && !this.rite.finished) {
       this.rite.press(true);
       this.isDragging = true;
@@ -698,6 +718,14 @@ export class TempleScene {
   };
 
   private onPointerMove = (e: PointerEvent) => {
+    if (this.possession) {
+      if (this.pointerLocked) this.possession.look(e.movementX, e.movementY);
+      else if (this.isDragging) {
+        this.possession.look(e.clientX - this.previousPointerPos.x, e.clientY - this.previousPointerPos.y);
+        this.previousPointerPos = { x: e.clientX, y: e.clientY };
+      }
+      return;
+    }
     if (this.rite && this.isDragging) this.rite.drag(e.movementX || e.clientX - this.previousPointerPos.x);
     if (this.pointerLocked) {
       this.turn(e.movementX, e.movementY, 0.0022);
@@ -778,6 +806,10 @@ export class TempleScene {
 
   private onPointerUp = (e: PointerEvent) => {
     this.isDragging = false;
+    if (this.possession) {
+      this.possession.press(false);
+      return;
+    }
     if (this.rite) {
       this.rite.press(false);
       return;
@@ -850,6 +882,17 @@ export class TempleScene {
    * Update Player Movement & Camera Position
    */
   private updatePlayerMovement(delta: number) {
+    if (this.possession) {
+      if (!this.possession.update(delta, this.elapsed)) this.wake();
+      this.setRes(this.possession ? this.possession.res : 1);
+      if (this.possession) {
+        this.renderer.toneMappingExposure = this.possession.exposure;
+        const f = this.scene.fog as THREE.FogExp2;
+        f.color.copy(this.possession.fog.color);
+        f.density = this.possession.fog.density;
+      }
+      return;
+    }
     if (this.watching) {
       // seated at the side of the mat, eyes on the medium
       const w = this.watching;
@@ -1503,6 +1546,77 @@ export class TempleScene {
   public stopWatching() {
     if (this.ceremony) this.ceremony.watching = false;
     this.watching = null;
+  }
+
+  /* ---------------- thanh đồng: inside the medium ---------------- */
+  private possession: Possession | null = null;
+  private touches = 0;
+  private touchAt = -99;
+  private fogSave: { c: THREE.Color; d: number } | null = null;
+  /** a click on the medium: the first time it stops and stares; the second time, you are taken */
+  public touchMedium(clientX?: number, clientY?: number): boolean {
+    if (!this.ceremony || this.possession || this.enc || this.arriving) return false;
+    if (clientX === undefined || clientY === undefined) this._ndc.set(0, 0);
+    else {
+      const r = this.renderer.domElement.getBoundingClientRect();
+      this._ndc.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+    }
+    this._raycaster.setFromCamera(this._ndc, this.camera);
+    if (!this.ceremony.hit(this._raycaster)) return false;
+    if (this.elapsed - this.touchAt > 25) this.touches = 0;
+    this.touchAt = this.elapsed;
+    this.touches++;
+    if (this.touches === 1) {
+      this.ceremony.stareAt(this.camera.position, 4.5);
+      soundService.whisper(5, Math.random() < 0.5 ? -0.6 : 0.6);
+      this.callbacks.onPossess?.({ type: 'touch' });
+    } else this.possess();
+    return true;
+  }
+  private resNow = 1;
+  private resBase = 1;
+  private setRes(r: number) {
+    if (r === this.resNow) return;
+    if (this.resNow === 1) this.resBase = this.renderer.getPixelRatio();
+    this.resNow = r;
+    this.renderer.setPixelRatio(this.resBase * r);
+    this.onWindowResize();
+  }
+  /** slip into the medium's body */
+  public possess() {
+    if (!this.ceremony || !this.hands || this.possession) return;
+    this.touches = 0;
+    this.cancelRite();
+    if (this.watching) this.stopWatching();
+    this.releasePointer();
+    const f = this.scene.fog as THREE.FogExp2;
+    this.fogSave = { c: f.color.clone(), d: f.density };
+    soundService.setChauVanVolume(0);
+    this.possession = new Possession(this.scene, this.camera, this.ceremony, this.hands, this.ground(0, -11), (e) => this.callbacks.onPossess?.(e));
+  }
+  public skipPossession() {
+    this.possession?.skip();
+  }
+  public get possessed() {
+    return !!this.possession;
+  }
+  /** wake on the mat at the side of the hall, the medium dancing on as if nothing happened */
+  private wake() {
+    this.possession?.dispose();
+    this.possession = null;
+    this.renderer.toneMappingExposure = 0.95;
+    if (this.fogSave) {
+      const f = this.scene.fog as THREE.FogExp2;
+      f.color.copy(this.fogSave.c);
+      f.density = this.fogSave.d;
+    }
+    const x = 1.6, z = -7.2;
+    this.playerPosition.set(x, 1.7 + this.ground(x, z), z);
+    this.playerRotationY = Math.atan2(x, z + 11);
+    this.playerPitch = 0.08;
+    this.kneelTarget = 0.75;
+    setTimeout(() => (this.kneelTarget = 0), 3200);
+    this.callbacks.onPossess?.({ type: 'phase', phase: 'done' });
   }
 
   /** carry a Mid-Autumn star lantern */

@@ -20,7 +20,7 @@ const P = (x: number, y: number, z: number, rx: number, ry: number, rz: number, 
   r: new THREE.Euler(rx, ry, rz, 'YXZ'),
   curl,
 });
-export type PoseName = 'hidden' | 'joined' | 'raised' | 'light' | 'plant' | 'tube' | 'receive' | 'slip' | 'coins';
+export type PoseName = 'hidden' | 'joined' | 'raised' | 'light' | 'plant' | 'tube' | 'receive' | 'slip' | 'coins' | 'spread' | 'veil';
 const POSES: Record<PoseName, [HandPose, HandPose]> = {
   hidden: [P(-0.2, -0.95, -0.3, 0, 0, 0), P(0.2, -0.95, -0.3, 0, 0, 0)],
   // chắp tay: palms together, fingers up, in front of the chest
@@ -39,6 +39,10 @@ const POSES: Record<PoseName, [HandPose, HandPose]> = {
   slip: [P(-0.11, -0.2, -0.4, 0.5, 0.2, Math.PI / 2 + 0.2, 0.6), P(0.11, -0.2, -0.4, 0.5, -0.2, -Math.PI / 2 - 0.2, 0.6)],
   // cupping two coins
   coins: [P(-0.03, -0.26, -0.4, -0.2, 0.3, Math.PI, 0.5), P(0.03, -0.25, -0.4, -0.2, -0.3, Math.PI, 0.5)],
+  // the spirit's dance: arms flung wide, palms up
+  spread: [P(-0.34, -0.12, -0.42, -0.15, 0.5, Math.PI - 0.3, 0.25), P(0.34, -0.12, -0.42, -0.15, -0.5, Math.PI + 0.3, 0.25)],
+  // under the veil: hands resting on the knees, fingers trembling
+  veil: [P(-0.15, -0.25, -0.44, -0.55, 0.15, 0, 0.45), P(0.15, -0.25, -0.44, -0.55, -0.15, 0, 0.45)],
 };
 
 function makeHand(side: 1 | -1, sleeveColor: number) {
@@ -76,7 +80,7 @@ function makeHand(side: 1 | -1, sleeveColor: number) {
   const fore = new THREE.Mesh(new THREE.CylinderGeometry(0.027, 0.033, 1, 10), skin);
   const sl = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.075, 1, 14, 1, true), sleeve);
   const cf = new THREE.Mesh(new THREE.CylinderGeometry(0.062, 0.062, 0.03, 14, 1, true), cuff);
-  return { hand, fingers, thumb, fore, sl, cf };
+  return { hand, fingers, thumb, fore, sl, cf, sleeve };
 }
 
 function stretch(m: THREE.Object3D, a: THREE.Vector3, b: THREE.Vector3) {
@@ -108,6 +112,10 @@ export class Hands {
     });
     camera.add(this.rig);
     this.rig.visible = false;
+  }
+  /** dress the sleeves (the medium's robe when you are inside them) */
+  setSleeve(c: number) {
+    this.h.forEach((x) => x.sleeve.color.setHex(c));
   }
   pose(name: PoseName) {
     this.target = POSES[name];

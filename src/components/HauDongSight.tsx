@@ -102,7 +102,7 @@ interface Note {
   state: 'live' | 'hit' | 'miss';
 }
 
-export const HauDongSight: React.FC<{ ctl: CeremonyControl; onClose: () => void; onBlessed: (share: number) => void }> = ({ ctl, onClose, onBlessed }) => {
+export const HauDongSight: React.FC<{ ctl: CeremonyControl; onClose: () => void; onBlessed: (share: number) => void; onTouch?: (x: number, y: number) => boolean }> = ({ ctl, onClose, onBlessed, onTouch }) => {
   const [phase, setPhase] = useState<'intro' | 'card' | 'play' | 'end'>('intro');
   const [gi, setGi] = useState(0);
   const [energy, setEnergy] = useState(0);
@@ -258,7 +258,11 @@ export const HauDongSight: React.FC<{ ctl: CeremonyControl; onClose: () => void;
   const share = total.current.all ? Math.round((total.current.hit / total.current.all) * 100) : 0;
 
   return (
-    <div className="fixed inset-0 z-[45] select-none" onPointerDown={() => phase === 'play' && judge()} role="dialog" aria-label="Hầu đồng">
+    <div className="fixed inset-0 z-[45] select-none" onPointerDown={(e) => {
+        // reaching out to the medium itself is another thing entirely
+        if (onTouch?.(e.clientX, e.clientY)) return;
+        if (phase === 'play') judge();
+      }} role="dialog" aria-label="Hầu đồng">
       <style>{SIGHT_CSS}</style>
       {/* soft vignette, the hall stays visible */}
       <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,transparent_45%,rgba(15,10,8,.7)_100%)]" />
