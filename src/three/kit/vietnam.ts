@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { Architecture } from './architecture';
 import type { KitMaterials } from './materials';
 import { viTexture } from './materials';
+import { sacredMother } from './mother';
 
 /**
  * Vietnamese temple kit: upturned "đầu đao" roof corners, ridges with "lưỡng long chầu nguyệt"
@@ -703,9 +704,9 @@ export class VietKit {
       g.add(box(w + 0.1, 0.12, d + 0.1, G, 0, (i + 1) * 1.0, z));
     });
     // top tier: the Three Mothers (Tam Tòa Thánh Mẫu): red centre, green left, white right
-    const mothers: [number, number][] = [[0, 0xb81c1c], [-1.7, 0x2f8a4a], [1.7, 0xf4f1ea]];
-    mothers.forEach(([x, c]) => {
-      const mo = this.mother(c, 1.5);
+    const mothers: [number, number, number][] = [[0, 0xb81c1c, 0xe8b830], [-1.7, 0x2f8a4a, 0xe8b830], [1.7, 0xf4f1ea, 0x2f5a8a]];
+    mothers.forEach(([x, c, acc], i) => {
+      const mo = sacredMother(c, acc, 1.5, i + 3);
       mo.position.set(x, 3.0, -1.0);
       g.add(mo);
     });

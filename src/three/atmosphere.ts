@@ -51,7 +51,7 @@ export class HallAtmosphere {
     this.scene = scene;
     const F = o.floorY;
     const back = o.hallZ - o.hallD / 2;
-    this.faces = [-1.7, 0, 1.7].map((x) => new THREE.Vector3(x, F + 4.0, o.altarZ - 1.0));
+    this.faces = [-1.7, 0, 1.7].map((x) => new THREE.Vector3(x, F + 3.0 + 1.72, o.altarZ - 1.0));
 
     /* ---------- always there: silk, brass, banana leaves ---------- */
     // crimson silk curtains framing the altar, and a valance across the top
@@ -202,7 +202,7 @@ export class HallAtmosphere {
     // the altar's own glow: full by day, a low ember at night
     const g = this.scene.getObjectByName('altarGlow') as THREE.PointLight | undefined;
     if (g) {
-      g.intensity = m === 'night' ? 1.6 : m === 'twilight' ? 9 : 14;
+      g.intensity = m === 'night' ? 1.4 : m === 'twilight' ? 3.5 : 4;
       g.color.setHex(m === 'night' ? 0xff4a20 : 0xffb45a);
     }
   }
