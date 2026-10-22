@@ -468,6 +468,126 @@ class SoundService {
     osc.stop(at + dur + 0.05);
   }
 
+  /* ---------------- the living soundscape ---------------- */
+  private echo: GainNode | null = null;
+  /** a stone-hall echo for the night drum */
+  private echoBus(): GainNode | null {
+    const ctx = this.ctx;
+    if (!ctx) return null;
+    if (!this.echo) {
+      const input = ctx.createGain();
+      const d = ctx.createDelay(1);
+      d.delayTime.value = 0.23;
+      const fb = ctx.createGain();
+      fb.gain.value = 0.42;
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 900;
+      input.connect(ctx.destination);
+      input.connect(d);
+      d.connect(lp);
+      lp.connect(fb);
+      fb.connect(d);
+      lp.connect(ctx.destination);
+      this.echo = input;
+    }
+    return this.echo;
+  }
+  private boom(at: number, vol: number, f = 70) {
+    const ctx = this.ctx;
+    const bus = this.echoBus();
+    if (!ctx || !bus || this.isMuted) return;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f * 1.8, at);
+    o.frequency.exponentialRampToValueAtTime(f, at + 0.09);
+    g.gain.setValueAtTime(0, at);
+    g.gain.linearRampToValueAtTime(vol, at + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + 0.5);
+    o.connect(g);
+    g.connect(bus);
+    o.start(at);
+    o.stop(at + 0.6);
+  }
+  private scape = { tea: 0, birds: 0, lute: 0, drum: 0, trance: 0 };
+  private scapeTimer: number | null = null;
+  private nextDrum = 0;
+  private drumPhase = 0;
+  private lutePhrase = 0;
+  private droneOsc: OscillatorNode | null = null;
+  private droneGain: GainNode | null = null;
+  /**
+   * The temple's sound, mixed by where you stand:
+   * tea = cups clinking at the keeper's table, birds = the banyan, lute = a musician practising,
+   * drum = the trống văn heartbeat of the night, trance = the hum of a statue's gaze.
+   */
+  public setScape(v: Partial<{ tea: number; birds: number; lute: number; drum: number; trance: number }>) {
+    Object.assign(this.scape, v);
+    const ctx = this.initContext();
+    if (!ctx) return;
+    if (this.scapeTimer === null) this.scapeTimer = window.setInterval(() => this.scapeTick(), 120);
+    // the trance drone
+    if (!this.droneOsc) {
+      this.droneOsc = ctx.createOscillator();
+      this.droneOsc.type = 'sawtooth';
+      this.droneOsc.frequency.value = 55;
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 220;
+      this.droneGain = ctx.createGain();
+      this.droneGain.gain.value = 0;
+      this.droneOsc.connect(lp);
+      lp.connect(this.droneGain);
+      this.droneGain.connect(ctx.destination);
+      this.droneOsc.start();
+    }
+    this.droneGain!.gain.setTargetAtTime(this.isMuted ? 0 : this.scape.trance * 0.09, ctx.currentTime, 0.4);
+    this.droneOsc.frequency.setTargetAtTime(55 + this.scape.trance * 12, ctx.currentTime, 0.6);
+  }
+  public stopScape() {
+    if (this.scapeTimer !== null) clearInterval(this.scapeTimer);
+    this.scapeTimer = null;
+    if (this.droneGain && this.ctx) this.droneGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.2);
+  }
+  private scapeTick() {
+    const ctx = this.ctx;
+    if (!ctx || this.isMuted) return;
+    const now = ctx.currentTime;
+    const S = this.scape;
+    // porcelain teacups: two light clinks
+    if (S.tea > 0.02 && Math.random() < 0.035) {
+      const f = 2600 + Math.random() * 900;
+      this.tone(f, now, 0.18, 0.05 * S.tea, 'sine', f * 1.003);
+      this.tone(f * 1.34, now + 0.06 + Math.random() * 0.1, 0.14, 0.03 * S.tea, 'sine');
+    }
+    // birds in the banyan
+    if (S.birds > 0.02 && Math.random() < 0.06) {
+      const f = 2200 + Math.random() * 1400;
+      for (let i = 0; i < 2 + Math.floor(Math.random() * 3); i++) this.tone(f + i * 120, now + i * 0.09, 0.08, 0.03 * S.birds, 'sine', f * 1.25);
+    }
+    // a musician practising the moon lute: a phrase, a stop, try again
+    if (S.lute > 0.02 && Math.random() < 0.05) {
+      const scale = [293.7, 349.2, 392.0, 440.0, 523.3];
+      const phrase = [0, 1, 2, 1, 3, 2][this.lutePhrase % 6];
+      const len = 2 + Math.floor(Math.random() * 4);
+      for (let i = 0; i < len; i++) this.playLute(scale[(phrase + i) % 5], now + i * 0.3, 0.05 * S.lute);
+      this.lutePhrase++;
+    }
+    // trống văn: a heartbeat that quickens and slows, echoing off stone
+    if (S.drum > 0.02) {
+      if (this.nextDrum < now) this.nextDrum = now + 0.05;
+      while (this.nextDrum < now + 0.3) {
+        this.drumPhase += 1;
+        const tempo = 0.62 - 0.22 * (0.5 + 0.5 * Math.sin(this.drumPhase / 40));
+        const t = this.nextDrum;
+        this.boom(t, 0.32 * S.drum, 68);
+        this.boom(t + tempo * 0.28, 0.2 * S.drum, 82);
+        if (this.drumPhase % 8 === 0) this.tone(1700, t + tempo * 0.5, 0.05, 0.05 * S.drum, 'square', 1500);
+        this.nextDrum += tempo;
+      }
+    }
+  }
+
   /** The great bronze bell of the bell tower: low, long, with beating partials */
   public playGreatBell() {
     if (this.isMuted) return;
@@ -504,7 +624,28 @@ class SoundService {
     if (Math.random() < 0.3) this.tone(freq, t + 0.25, 0.7, vol * 0.5, 'triangle', freq * 1.06);
   }
 
+  /** the audio clock, for things that must land on the beat */
+  public get audioTime(): number {
+    return this.initContext()?.currentTime ?? 0;
+  }
+  /** phách: the bamboo clapper that keeps the beat */
+  public phach(at: number, accent = false) {
+    this.tone(1800, at, 0.05, accent ? 0.13 : 0.06, 'square', 1500);
+  }
+  public drum(at: number, vol = 0.24) {
+    this.tone(110, at, 0.32, vol, 'sine', 68);
+  }
+  /** a bright chime for a well-kept beat */
+  public sparkle(at: number, freq = 1568) {
+    this.tone(freq, at, 0.25, 0.05, 'sine', freq * 1.01);
+  }
+
   private chauVanTimer: number | null = null;
+  private cvVol = 1;
+  /** distant or close: the hầu đồng music fades with distance from the hall */
+  public setChauVanVolume(v: number) {
+    this.cvVol = Math.max(0, Math.min(1, v));
+  }
   /**
    * A loop in the spirit of chầu văn: moon-lute phrases on the Vietnamese pentatonic
    * (hò xự xang xê cống), over the "phách" clapper and a soft drum.
@@ -526,12 +667,12 @@ class SoundService {
       const t0 = this.ctx.currentTime + 0.05;
       const ph = phrases[bar % phrases.length];
       ph.forEach((n, i) => {
-        if (n >= 0) this.playLute(scale[n], t0 + i * beat, 0.12);
+        if (n >= 0 && this.cvVol > 0.02) this.playLute(scale[n], t0 + i * beat, 0.12 * this.cvVol);
         // phách: wooden clapper on every beat, accent on 1 and 5
-        this.tone(1800, t0 + i * beat, 0.05, i % 4 === 0 ? 0.12 : 0.05, 'square', 1500);
+        if (this.cvVol > 0.02) this.tone(1800, t0 + i * beat, 0.05, (i % 4 === 0 ? 0.12 : 0.05) * this.cvVol, 'square', 1500);
       });
       // drum on the downbeats
-      [0, 4].forEach((i) => this.tone(110, t0 + i * beat, 0.3, 0.22, 'sine', 70));
+      if (this.cvVol > 0.02) [0, 4].forEach((i) => this.tone(110, t0 + i * beat, 0.3, 0.22 * this.cvVol, 'sine', 70));
       bar++;
     };
     playBar();

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Sheet } from './ui/Sheet';
+import { fmtHour, hourOf, type Session } from '../services/templeDay';
 import { toLunar, yearName, yearAnimal, festivalOn, nextFestival, today, FESTIVALS, type Festival, type LunarDate } from '../services/lunar';
 
 /**
@@ -79,7 +80,9 @@ export const FestivalSheet: React.FC<{
   lunar: LunarDate;
   festival: Festival | null;
   onActivity: (f: Festival) => void;
-}> = ({ onClose, now, lunar, festival, onActivity }) => {
+  schedule?: Session[];
+}> = ({ onClose, now, lunar, festival, onActivity, schedule = [] }) => {
+  const h = hourOf(now);
   const list = useMemo(() => upcoming(now), [now]);
   const done = festival ? isFestivalDone(festivalKey(festival, lunar)) : false;
   return (
@@ -108,6 +111,28 @@ export const FestivalSheet: React.FC<{
         </section>
       ) : (
         <p className="mt-5 text-[14px] text-[#5a4837] text-center">An ordinary day. The temple is quiet, which is its own kind of gift.</p>
+      )}
+
+      {schedule.length > 0 && (
+        <section className="mt-5">
+          <h3 className="text-sm font-semibold text-[#211a15] mb-2">Today at the temple</h3>
+          <ol className="relative border-l-2 border-[#211a15] ml-2 space-y-1.5">
+            {schedule.map((x) => {
+              const nowOn = h >= x.from && h < x.to;
+              const past = h >= x.to;
+              return (
+                <li key={x.from} className={`pl-4 relative ${past ? 'opacity-45' : ''}`}>
+                  <span className={`absolute -left-[7px] top-1.5 w-3 h-3 rotate-45 border-2 border-[#211a15] ${nowOn ? 'bg-[#b8382b]' : 'bg-[#f3ead6]'}`} />
+                  <span className="text-xs tabular-nums font-semibold text-[#8e1b1b] mr-2">
+                    {fmtHour(x.from)}–{fmtHour(x.to)}
+                  </span>
+                  <span className="text-[14px] text-[#211a15]">{x.label}</span>
+                  {nowOn && <span className="ml-2 text-[11px] font-bold text-[#b8382b] uppercase tracking-wide">now</span>}
+                </li>
+              );
+            })}
+          </ol>
+        </section>
       )}
 
       <section className="mt-5 pb-1">

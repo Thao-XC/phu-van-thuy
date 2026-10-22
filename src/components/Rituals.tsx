@@ -273,7 +273,7 @@ export const AltarModal: React.FC<{
 /* Xin xăm: fortune sticks                                             */
 /* ------------------------------------------------------------------ */
 const TIER_RANK = { 'thuong-thuong': 0, thuong: 1, trung: 2, ha: 3 } as const;
-function drawXam(phuc: number): Xam {
+export function drawXam(phuc: number): Xam {
   const tilt = (phuc - 50) / 50;
   const weights = XAM.map((x) => Math.exp(tilt * (1.5 - TIER_RANK[x.tier]) * 0.8));
   let r = Math.random() * weights.reduce((a, b) => a + b, 0);

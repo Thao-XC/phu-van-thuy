@@ -309,6 +309,7 @@ export const phuVanThuy: Layout = (ctx) => {
     { id: 'fortune', type: 'fortune', name: 'Fortune sticks', vi: 'Xin xăm', at: [6.8, -9], look: [8.8, -9], r: 2.4 },
     { id: 'bell', type: 'bell', name: 'Bell tower', vi: 'Gác chuông', at: [18, -8], look: [BELL.x, BELL.z] },
     { id: 'river', type: 'river', name: 'Lantern landing', vi: 'Bến thả đèn', at: [0, 63], look: [0, 74], r: 3.4 },
+    { id: 'seat', type: 'haudong', name: 'Hầu đồng mat', vi: 'Chiếu xem hầu đồng', at: [-3.4, -6.6], look: [0, -11], r: 2.2 },
     { id: 'theatre', type: 'theatre', name: 'Water-puppet pavilion', vi: 'Thủy đình', at: [-7, 54.6], look: [-18.6, 53.6], r: 3.4 },
     { id: 'pond', type: 'view', name: 'Half-moon lotus pond', vi: 'Hồ bán nguyệt', at: [-5, 47], look: [POND.x, POND.z] },
     { id: 'banyan', type: 'view', name: 'The old banyan', vi: 'Cây đa', at: [-8, 26], look: [BANYAN.x, BANYAN.z] },

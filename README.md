@@ -48,6 +48,20 @@ Rằm tháng Giêng lanterns, Giỗ Mẫu five-colour flags, Vu Lan lights on th
 Ông Công Ông Táo, and busier courtyards on every new and full moon. Each festival has one activity (once per year, for
 phúc). Preview any day with `?date=YYYY-MM-DD`, e.g. `?date=2026-02-17` for Tết.
 
+**Afternoon and night in the hall.** By day, golden shafts of sun and drifting dust come through the open doors onto
+crimson silk, brass plates and banana-leaf offerings; teacups clink at the keeper's table, birds sing in the banyan and
+someone practises the moon lute. At night the world beyond the doors goes black; red altar candles pulse, a low oil lamp
+sways, the Mothers' statues throw towering shadows up the back wall, and a trống văn heartbeat echoes off the stone.
+Look up into a Mother's face for too long at night and the edges of the world begin to blur and ripple.
+
+**Hầu đồng.** Held in the main hall on a real schedule (mornings, evenings, longer on the 1st/15th, in the spring and
+autumn seasons, and all day on great festivals; see the calendar). Kneel on the mat inside the hall to watch it in 3D:
+five spirits in turn, each with their own costume, props, dance and coloured aura; keep the beat with the phách to make
+the aura bloom, or just watch.
+
+**Rituals by hand.** Incense: pick sticks from the vase, hold them in the candle flame, raise and bow three times, plant
+them in the ash. Fortune sticks: shake the tube (drag or ← →) until a stick falls, then ask the coins.
+
 **Saving.** Everything saves automatically in the browser, including where you stood. Returning visitors reappear
 where they left off; first-time visitors arrive by boat.
 

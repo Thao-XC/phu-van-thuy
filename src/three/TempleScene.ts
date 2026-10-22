@@ -9,7 +9,9 @@ import { VietKit } from './kit/vietnam';
 import { phuVanThuy } from './world/phuVanThuy';
 import type { GroundFn, LayoutCtx, LayoutResult, ParticleKind, SecretDef, Etiquette, SpotDef } from './world/types';
 import type { EncounterDef, EncounterEvent, EncounterRuntime, StoryCard, EncounterApi } from './encounters/types';
-import { Firefly, Visitors, Arrival } from './living';
+import { Firefly, Visitors, Arrival, Ceremony, type GiaLook } from './living';
+import { HallAtmosphere } from './atmosphere';
+import { WORLD } from './world/phuVanThuy';
 import { buildFestivalDecor, heldStar, type FestivalDecor } from './festivalDecor';
 import type { Decor } from '../services/lunar';
 
@@ -29,6 +31,10 @@ export interface SceneCallbacks {
   canEnter?: (id: string) => true | string;
   /** the first frame has been drawn */
   onReady?: () => void;
+  /** looking up into a Mother's face at night: 0 (nothing) .. 1 (deep trance) */
+  onGaze?: (level: number) => void;
+  /** the trance peaked: a vision */
+  onVision?: () => void;
   /** a floating place marker was clicked */
   onSpotClick?: (spotId: string) => void;
   /** PC: the place marker under the crosshair changed */
@@ -359,6 +365,17 @@ export class TempleScene {
     this.firefly.onArrive = () => this.callbacks.onGuideArrive?.();
     this.firefly.attach(this.scene, this.playerPosition.clone().add(new THREE.Vector3(-1, 0, -1)));
     this.visitors = new Visitors(this.scene, this.ground);
+    this.hall = new HallAtmosphere(this.scene, this.ground, {
+      hallZ: WORLD.HALL.z,
+      hallD: WORLD.HALL.d,
+      frontZ: WORLD.HALL_FRONT,
+      floorY: WORLD.FLOOR_Y,
+      altarZ: WORLD.HALL.z - WORLD.HALL.d / 2 + 2.4,
+    });
+    this.hall.setMode(this.timeOfDay);
+    this.scene.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) o.receiveShadow = true;
+    });
     this.bellObj = this.scene.getObjectByName('bell') ?? null;
     this.createParticles(this.particleKind);
     this.playerPosition.set(res.spawn.x, 1.7 + this.ground(res.spawn.x, res.spawn.z), res.spawn.z);
@@ -435,6 +452,7 @@ export class TempleScene {
    */
   public setTimeOfDay(time: TimeOfDay) {
     this.timeOfDay = time;
+    this.hall?.setMode(time);
     this.nightObjects.forEach((o) => (o.visible = time === 'night'));
     this.onTime?.(time);
     if (this.enc && this.enc.rt) return; // keep the secret world's own light until you return
@@ -475,22 +493,23 @@ export class TempleScene {
       this.dynamicLights.forEach((l) => (l.intensity = 1.5));
     } else {
       // Night (Yozora)
-      this.scene.background = new THREE.Color(0x0c1220);
-      (this.scene.fog as THREE.FogExp2).color.set(0x0c1220);
-      (this.scene.fog as THREE.FogExp2).density = 0.018 * this.fogMul;
+      // the physical temple falls asleep: black beyond the doors
+      this.scene.background = new THREE.Color(0x030306);
+      (this.scene.fog as THREE.FogExp2).color.set(0x030306);
+      (this.scene.fog as THREE.FogExp2).density = 0.032 * this.fogMul;
 
-      this.sunLight.color.set(0x6688cc); // Moon light
-      this.sunLight.intensity = 0.45;
+      this.sunLight.color.set(0x5a6a9a); // a thin moon
+      this.sunLight.intensity = 0.16;
       this.sunOffset.set(-25, 40, -15);
 
-      this.hemiLight.color.set(0x223355);
-      this.hemiLight.groundColor.set(0x080c14);
-      this.hemiLight.intensity = 0.3;
+      this.hemiLight.color.set(0x1a1a2a);
+      this.hemiLight.groundColor.set(0x050505);
+      this.hemiLight.intensity = 0.1;
 
-      this.ambientFill.intensity = 0.08;
+      this.ambientFill.intensity = 0.03;
 
-      // Brilliant warm glowing lanterns in the dark
-      this.dynamicLights.forEach((l) => (l.intensity = 2.4));
+      // only a few lanterns still burn outside
+      this.dynamicLights.forEach((l) => (l.intensity = 0.9));
     }
   }
 
@@ -805,6 +824,16 @@ export class TempleScene {
    * Update Player Movement & Camera Position
    */
   private updatePlayerMovement(delta: number) {
+    if (this.watching) {
+      // seated at the side of the mat, eyes on the medium
+      const w = this.watching;
+      w.t = Math.min(1, w.t + delta * 0.6);
+      const gy = this.ground(-2.2, -7.4);
+      const seat = new THREE.Vector3(-2.2 + Math.sin(this.elapsed * 0.3) * 0.08, gy + 1.15, -7.4);
+      this.camera.position.lerpVectors(w.from, seat, w.t * w.t * (3 - 2 * w.t));
+      this.camera.lookAt(0, gy + 1.2, -11);
+      return;
+    }
     if (this.arrival && !this.arrival.done) {
       this.arrival.update(delta, this.camera, this.arrivalLook);
       if (this.arrival.done) this.finishArrival();
@@ -1314,6 +1343,40 @@ export class TempleScene {
     this.festival?.releaseCarp?.();
     soundService.playSplash();
   }
+  /* ---------------- the hầu đồng in the hall ---------------- */
+  private ceremony: Ceremony | null = null;
+  public setCeremony(on: boolean) {
+    if (on && !this.ceremony) {
+      this.ceremony = new Ceremony(this.scene, this.ground);
+      soundService.setChauVanVolume(0);
+      soundService.startChauVan();
+    } else if (!on && this.ceremony) {
+      this.ceremony.dispose(this.scene);
+      this.ceremony = null;
+      soundService.stopChauVan();
+    }
+  }
+
+  /** sit on the mat and watch: the camera settles into a seated view of the medium */
+  private watching: { from: THREE.Vector3; t: number } | null = null;
+  public startWatching() {
+    if (!this.ceremony) return null;
+    this.ceremony.watching = true;
+    this.watching = { from: this.camera.position.clone(), t: 0 };
+    this.releasePointer();
+    const c = this.ceremony;
+    return {
+      setGia: (i: number, look: GiaLook) => c.setWatchGia(i, look),
+      setEnergy: (e: number) => c.setEnergy(e),
+      burst: () => c.burst(),
+      scatterLoc: () => c.scatterLoc(),
+    };
+  }
+  public stopWatching() {
+    if (this.ceremony) this.ceremony.watching = false;
+    this.watching = null;
+  }
+
   /** carry a Mid-Autumn star lantern */
   public carryStar(on: boolean) {
     if (on && !this.star) {
@@ -1335,12 +1398,72 @@ export class TempleScene {
   public guideTo(x: number, z: number) {
     this.firefly?.guide(x, z);
   }
+  private hall: HallAtmosphere | null = null;
+  private gazeT = 0;
+  private gazeLevel = 0;
+  private gazePeak = 0;
+  private scapeT = 0;
+  private _fwd = new THREE.Vector3();
+  private _to = new THREE.Vector3();
+  /** night: look up into a Mother's face long enough and the world begins to ripple */
+  private updateGaze(dt: number) {
+    let looking = false;
+    if (this.hall && this.timeOfDay === 'night' && !this.enc && !this.watching && !this.arriving) {
+      this.camera.getWorldDirection(this._fwd);
+      for (const f of this.hall.faces) {
+        this._to.copy(f).sub(this.camera.position);
+        const d = this._to.length();
+        if (d < 15 && this._fwd.angleTo(this._to.normalize()) < 0.26 && this.playerPitch > 0.05) looking = true;
+      }
+    }
+    this.gazeT = looking ? this.gazeT + dt : Math.max(0, this.gazeT - dt * 2.2);
+    const lvl = Math.max(0, Math.min(1, (this.gazeT - 1.4) / 2.8));
+    if (Math.abs(lvl - this.gazeLevel) > 0.03 || (lvl === 0 && this.gazeLevel !== 0)) {
+      this.gazeLevel = lvl;
+      this.callbacks.onGaze?.(lvl);
+    }
+    this.gazePeak = lvl >= 1 ? this.gazePeak + dt : 0;
+    if (this.gazePeak > 1.4) {
+      this.gazePeak = 0;
+      this.gazeT = 0;
+      this.playerPitch = -0.12;
+      this.callbacks.onVision?.();
+    }
+  }
+  /** the soundscape follows you: tea by the keeper, birds in the banyan, a lute practising, the night drum */
+  private updateScape(dt: number) {
+    this.scapeT += dt;
+    if (this.scapeT < 0.25) return;
+    this.scapeT = 0;
+    const p = this.playerPosition;
+    const near = (x: number, z: number, r: number) => Math.max(0, Math.min(1, 1 - Math.hypot(p.x - x, p.z - z) / r));
+    const tod = this.timeOfDay;
+    const away = !!this.enc;
+    const hallNear = near(0, -12, 34);
+    soundService.setScape({
+      tea: away || tod === 'night' ? 0 : near(1.2, 20.2, 16),
+      birds: away || tod === 'night' ? 0 : near(WORLD.BANYAN.x, WORLD.BANYAN.z, 30) * (tod === 'day' ? 1 : 0.5),
+      lute: away || tod === 'night' || this.ceremony ? 0 : 0.35 + hallNear * 0.5,
+      drum: away || tod !== 'night' ? 0 : 0.25 + hallNear * 0.75,
+      trance: this.gazeLevel,
+    });
+  }
+
   private updateLiving(dt: number) {
     const t = this.elapsed;
+    this.hall?.update(t, dt);
+    this.updateGaze(dt);
+    this.updateScape(dt);
     const outside = !this.enc;
-    this.firefly?.update(dt, t, this.playerPosition, this.playerRotationY, outside && !this.arriving && !this.isCinematicMode);
+    this.firefly?.update(dt, t, this.playerPosition, this.playerRotationY, outside && !this.arriving && !this.isCinematicMode && !this.watching);
     this.visitors?.update(dt, t, this.playerPosition, outside);
     this.festival?.update(t, dt);
+    if (this.ceremony) {
+      this.ceremony.update(t, dt);
+      // the music carries from the hall: loud inside, faint at the gate, silent in the realms
+      const d = Math.hypot(this.playerPosition.x, this.playerPosition.z + 10);
+      soundService.setChauVanVolume(this.enc || this.watching ? 0 : Math.max(0, Math.min(1, 1.15 - d / 38)));
+    }
     if (this.arrival?.done) this.arrival.leave(dt);
   }
 
@@ -1451,7 +1574,7 @@ export class TempleScene {
   private updateMarkers() {
     for (const m of this.markers) {
       const d = Math.hypot(this.playerPosition.x - m.g.position.x, this.playerPosition.z - m.g.position.z);
-      const show = !this.enc && !this.isCinematicMode && !this.arriving && d > 3.8 && d < 20;
+      const show = !this.enc && !this.isCinematicMode && !this.arriving && !this.watching && d > 3.8 && d < 20;
       m.g.visible = show;
       if (!show) continue;
       m.g.position.y = m.baseY + Math.sin(this.elapsed * 2 + m.g.position.x) * 0.08;
@@ -1552,6 +1675,8 @@ export class TempleScene {
    * Cleanup
    */
   public dispose() {
+    this.setCeremony(false);
+    soundService.stopScape();
     this.isRunning = false;
     if (this.animFrameId !== null) {
       cancelAnimationFrame(this.animFrameId);

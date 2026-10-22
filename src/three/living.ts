@@ -310,3 +310,304 @@ export class Arrival {
     if (this.boat.position.x > 60) this.boat.visible = false;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* a hầu đồng in progress, inside the main hall                         */
+/* ------------------------------------------------------------------ */
+export interface GiaLook {
+  robe: number;
+  under: number;
+  aura: number;
+  prop: 'none' | 'fans' | 'sword' | 'cup' | 'baskets';
+  veiled: boolean;
+  dance: 'still' | 'sway' | 'spin' | 'stride' | 'skip';
+}
+/** the spirits as they come and go while nobody is watching closely */
+export const AMBIENT_GIA: GiaLook[] = [
+  { robe: 0xc81e1e, under: 0xe8b830, aura: 0xff6b4a, prop: 'none', veiled: true, dance: 'still' },
+  { robe: 0xf3efe4, under: 0x2f5a8a, aura: 0xbfe3ff, prop: 'sword', veiled: false, dance: 'stride' },
+  { robe: 0x3f8a3a, under: 0xe8b830, aura: 0x7dffa0, prop: 'fans', veiled: false, dance: 'spin' },
+  { robe: 0xe8b830, under: 0xc81e1e, aura: 0xffd84a, prop: 'cup', veiled: false, dance: 'sway' },
+  { robe: 0x8db27a, under: 0xe7a28f, aura: 0xff9ad6, prop: 'baskets', veiled: false, dance: 'skip' },
+];
+
+const mat = (c: number, extra: Partial<THREE.MeshStandardMaterialParameters> = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.75, ...extra });
+
+export class Ceremony {
+  private g = new THREE.Group();
+  private y0: number;
+  /** the medium: a figure with arms we can move, a veil, and props */
+  private medium = new THREE.Group();
+  private body: THREE.Group;
+  private robeMats: THREE.MeshStandardMaterial[] = [];
+  private underMats: THREE.MeshStandardMaterial[] = [];
+  private veil: THREE.Mesh;
+  private arms: THREE.Group[] = [];
+  private props: Record<string, THREE.Group> = {};
+  private light = new THREE.PointLight(0xffb070, 2.2, 14, 2);
+  private auraLight = new THREE.PointLight(0xffffff, 0, 10, 2);
+  private column: THREE.Mesh;
+  private ring: THREE.Points;
+  private ringPos: Float32Array;
+  private bursts: { m: THREE.Mesh; t: number }[] = [];
+  private loc: { m: THREE.Mesh; v: THREE.Vector3; t: number }[] = [];
+  private drum: THREE.Mesh;
+  private lutist: THREE.Group;
+  private look: GiaLook = AMBIENT_GIA[0];
+  private energy = 0;
+  /** someone is sitting on the mat and keeping the beat */
+  watching = false;
+  private watchGia = 0;
+  private beatPulse = 0;
+
+  constructor(private scene: THREE.Scene, ground: Ground) {
+    this.y0 = ground(0, -10.6);
+    const y = this.y0;
+    // the red mat and a low tray of offerings
+    const rug = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 3.2), mat(0xb8382b, { roughness: 0.95 }));
+    rug.rotation.x = -Math.PI / 2;
+    rug.position.set(0, y + 0.02, -10.8);
+    this.g.add(rug);
+    const tray = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.3, 0.12, 14), mat(0xd6a12b, { metalness: 0.4 }));
+    tray.position.set(0, y + 0.06, -12.1);
+    this.g.add(tray);
+
+    // the medium
+    this.body = new THREE.Group();
+    const robe = mat(0xc81e1e), under = mat(0xe8b830), skin = mat(0xf1d3b8);
+    this.robeMats.push(robe);
+    this.underMats.push(under);
+    const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.58, 1.2, 12), robe);
+    skirt.position.y = 0.6;
+    const hem = new THREE.Mesh(new THREE.CylinderGeometry(0.59, 0.6, 0.1, 12), under);
+    hem.position.y = 0.06;
+    const sash = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.25, 0.1, 12), under);
+    sash.position.y = 0.98;
+    const chest = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.24, 0.35, 12), robe);
+    chest.position.y = 1.18;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 14, 10), skin);
+    head.position.y = 1.5;
+    const khan = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.055, 8, 16), under);
+    khan.rotation.x = Math.PI / 2;
+    khan.position.y = 1.59;
+    this.body.add(skirt, hem, sash, chest, head, khan);
+    [-1, 1].forEach((sd) => {
+      const arm = new THREE.Group();
+      arm.position.set(sd * 0.24, 1.3, 0);
+      const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.16, 0.62, 8), robe);
+      sleeve.position.y = -0.3;
+      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), skin);
+      hand.position.y = -0.64;
+      arm.add(sleeve, hand);
+      arm.rotation.z = sd * 0.25;
+      this.arms.push(arm);
+      this.body.add(arm);
+    });
+    // khăn phủ diện: the red veil
+    this.veil = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.36, 0.62, 12, 1, true), mat(0xc81e1e, { side: THREE.DoubleSide, emissive: 0x3a0800 }));
+    this.veil.position.y = 1.42;
+    this.body.add(this.veil);
+    // props, held in the hands
+    const fan = () => {
+      const f = new THREE.Mesh(new THREE.CircleGeometry(0.32, 16, 0, Math.PI), mat(0xe8b830, { side: THREE.DoubleSide, emissive: 0x3a2a00 }));
+      f.position.y = -0.82;
+      return f;
+    };
+    this.props.fans = new THREE.Group();
+    this.props.sword = new THREE.Group();
+    this.props.cup = new THREE.Group();
+    this.props.baskets = new THREE.Group();
+    this.arms.forEach((a, i) => {
+      const f = fan();
+      f.userData.prop = 'fans';
+      a.add(f);
+      const b = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.08, 0.12, 10), mat(0x9c7a46));
+      b.position.y = -0.74;
+      b.userData.prop = 'baskets';
+      const fl = new THREE.Mesh(new THREE.IcosahedronGeometry(0.09, 0), mat(0xf29bb8, { emissive: 0x4a1020 }));
+      fl.position.y = 0.08;
+      b.add(fl);
+      a.add(b);
+      if (i === 1) {
+        const sw = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.9, 0.06), mat(0xd8dde2, { metalness: 0.8, roughness: 0.25 }));
+        sw.position.y = -1.05;
+        sw.userData.prop = 'sword';
+        a.add(sw);
+        const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.04, 0.08, 10), mat(0xd6a12b, { metalness: 0.5 }));
+        cup.position.y = -0.7;
+        cup.userData.prop = 'cup';
+        a.add(cup);
+      }
+    });
+    this.medium.add(this.body);
+    this.medium.position.set(0, y, -11);
+    this.medium.traverse((o) => ((o as THREE.Mesh).castShadow = true));
+    this.g.add(this.medium);
+
+    // the aura: a soft column of light, a ring of motes, a coloured light
+    this.column = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.3, 4.2, 24, 1, true), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+    this.column.position.set(0, y + 2, -11);
+    this.g.add(this.column);
+    const N = 90;
+    this.ringPos = new Float32Array(N * 3);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(this.ringPos, 3));
+    this.ring = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.09, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
+    this.g.add(this.ring);
+    this.auraLight.position.set(0, y + 1.4, -10.4);
+    this.g.add(this.auraLight);
+
+    // the cung văn band and attendants
+    this.lutist = robedFigure({ robe: 0x34507a, under: 0xf1ead8, h: 1.1 });
+    this.lutist.position.set(-2.3, y, -9.7);
+    const lute = new THREE.Group();
+    const bodyL = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.06, 16), mat(0xd6a12b));
+    bodyL.rotation.x = Math.PI / 2;
+    const neck = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.8, 0.04), mat(0x5b3b22));
+    neck.position.set(0.25, 0.32, 0);
+    neck.rotation.z = -0.6;
+    lute.add(bodyL, neck);
+    lute.position.set(0.1, 0.62, 0.25);
+    this.lutist.add(lute);
+    this.g.add(this.lutist);
+    const clapper = robedFigure({ robe: 0x6b4a2e, under: 0xe8b830, h: 1.05 });
+    clapper.position.set(-2.9, y, -11.2);
+    this.g.add(clapper);
+    this.drum = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.42, 16), mat(0xb8382b));
+    this.drum.position.set(2.5, y + 0.21, -9.9);
+    const skinTop = new THREE.Mesh(new THREE.CircleGeometry(0.33, 16), mat(0xf3ead6));
+    skinTop.rotation.x = -Math.PI / 2;
+    skinTop.position.y = 0.22;
+    this.drum.add(skinTop);
+    this.g.add(this.drum);
+    const drummer = robedFigure({ robe: 0x34507a, under: 0xf1ead8, h: 1.05 });
+    drummer.position.set(3.1, y, -10.3);
+    this.g.add(drummer);
+    [
+      [-1.4, -12.3],
+      [1.4, -12.3],
+    ].forEach(([x, z]) => {
+      const f = robedFigure({ robe: 0xf1ead8, under: 0xb8382b, h: 1.05 });
+      f.position.set(x, y, z);
+      this.g.add(f);
+    });
+    [this.lutist, clapper, drummer].forEach((f) => f.lookAt(0, y, -11));
+
+    this.light.position.set(0, y + 3, -10.5);
+    this.g.add(this.light);
+    scene.add(this.g);
+    this.apply(AMBIENT_GIA[0]);
+  }
+
+  /** dress the medium for a spirit */
+  apply(look: GiaLook) {
+    this.look = look;
+    this.robeMats.forEach((m) => m.color.setHex(look.robe));
+    this.underMats.forEach((m) => m.color.setHex(look.under));
+    this.veil.visible = look.veiled;
+    this.medium.traverse((o) => {
+      const p = o.userData.prop;
+      if (p) o.visible = p === look.prop;
+    });
+    (this.column.material as THREE.MeshBasicMaterial).color.setHex(look.aura);
+    (this.ring.material as THREE.PointsMaterial).color.setHex(look.aura);
+    this.auraLight.color.setHex(look.aura);
+  }
+  setEnergy(e: number) {
+    this.energy = e;
+  }
+  /** a kept beat: a ring of light bursts from the medium */
+  burst() {
+    const m = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.05, 6, 32), new THREE.MeshBasicMaterial({ color: this.look.aura, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
+    m.rotation.x = Math.PI / 2;
+    m.position.set(this.medium.position.x, this.y0 + 1.1, -11);
+    this.g.add(m);
+    this.bursts.push({ m, t: 0 });
+    this.beatPulse = 1;
+  }
+  /** at the end the spirits scatter lộc over everyone */
+  scatterLoc() {
+    for (let i = 0; i < 26; i++) {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 0.18), new THREE.MeshStandardMaterial({ color: 0xc81e1e, side: THREE.DoubleSide, emissive: 0x3a0800 }));
+      m.position.set(this.medium.position.x, this.y0 + 1.5, -11);
+      this.g.add(m);
+      this.loc.push({ m, v: new THREE.Vector3((Math.random() - 0.5) * 3, 3 + Math.random() * 2, 2 + Math.random() * 3), t: 0 });
+    }
+  }
+  /** while someone watches, the app chooses the spirit; otherwise they change every half minute */
+  setWatchGia(i: number, look: GiaLook) {
+    this.watchGia = i;
+    this.apply(look);
+  }
+
+  update(t: number, dt = 1 / 60) {
+    if (!this.watching) {
+      const gi = Math.floor(t / 30) % AMBIENT_GIA.length;
+      if (AMBIENT_GIA[gi] !== this.look) this.apply(AMBIENT_GIA[gi]);
+      this.energy = 0.35 + Math.sin(t * 0.7) * 0.1;
+    }
+    const L = this.look;
+    const e = this.energy;
+    // dance
+    const s = t * (L.dance === 'skip' ? 3.2 : L.dance === 'spin' ? 2.4 : 1.8);
+    const m = this.medium;
+    m.rotation.y = L.dance === 'spin' ? s * 0.9 : L.dance === 'still' ? 0 : Math.sin(s) * 0.7;
+    m.position.x = L.dance === 'stride' ? Math.sin(s * 0.5) * 0.9 : L.dance === 'still' ? 0 : Math.sin(s * 0.5) * 0.4;
+    m.position.y = this.y0 + (L.dance === 'skip' ? Math.abs(Math.sin(s * 2)) * 0.12 : L.dance === 'still' ? 0 : Math.abs(Math.sin(s * 2)) * 0.04);
+    this.body.rotation.x = L.dance === 'still' ? Math.sin(t * 0.8) * 0.03 : 0;
+    this.arms.forEach((a, i) => {
+      const sd = i === 0 ? -1 : 1;
+      if (L.dance === 'still') a.rotation.set(-0.6, 0, sd * 0.2);
+      else if (L.prop === 'fans' || L.prop === 'baskets') a.rotation.set(Math.sin(s * 2 + i) * 0.5 - 0.4, 0, sd * (1.3 + Math.sin(s * 2 + i * 1.5) * 0.6));
+      else if (L.prop === 'sword') a.rotation.set(i ? Math.sin(s * 1.5) * 1.2 - 1.2 : -0.3, 0, sd * (i ? 0.9 + Math.sin(s * 3) * 0.5 : 0.4));
+      else a.rotation.set(-0.9 + Math.sin(s * 1.2 + i) * 0.4, 0, sd * 0.7);
+    });
+    // aura grows with the room's energy (and the beat)
+    this.beatPulse = Math.max(0, this.beatPulse - dt * 3);
+    const k = Math.min(1, e + this.beatPulse * 0.3);
+    (this.column.material as THREE.MeshBasicMaterial).opacity = 0.05 + k * 0.32;
+    this.column.scale.set(0.8 + k * 0.6, 1, 0.8 + k * 0.6);
+    this.column.position.x = m.position.x;
+    (this.ring.material as THREE.PointsMaterial).opacity = 0.2 + k * 0.8;
+    const n = this.ringPos.length / 3;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + t * (0.6 + (i % 3) * 0.2);
+      const r = 1.1 + k * 0.9 + Math.sin(t * 2 + i) * 0.1;
+      this.ringPos[i * 3] = m.position.x + Math.cos(a) * r;
+      this.ringPos[i * 3 + 1] = this.y0 + 0.2 + ((i * 0.37 + t * (0.5 + k)) % 3.2);
+      this.ringPos[i * 3 + 2] = -11 + Math.sin(a) * r;
+    }
+    (this.ring.geometry.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+    this.auraLight.intensity = 0.4 + k * 3.2;
+    this.light.intensity = 1.6 + Math.sin(t * 6) * 0.2;
+    // musicians
+    this.drum.scale.y = 1 - this.beatPulse * 0.06;
+    this.lutist.rotation.z = Math.sin(t * 5) * 0.02;
+    // bursts and lộc
+    this.bursts = this.bursts.filter((b) => {
+      b.t += dt;
+      b.m.scale.setScalar(1 + b.t * 4);
+      (b.m.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.9 - b.t * 1.5);
+      if (b.t > 0.6) {
+        this.g.remove(b.m);
+        return false;
+      }
+      return true;
+    });
+    this.loc = this.loc.filter((l) => {
+      l.t += dt;
+      l.v.y -= 4.5 * dt;
+      l.m.position.addScaledVector(l.v, dt);
+      l.m.rotation.x += dt * 6;
+      l.m.rotation.y += dt * 4;
+      if (l.m.position.y < this.y0 + 0.05 || l.t > 4) {
+        l.m.position.y = Math.max(l.m.position.y, this.y0 + 0.03);
+        return l.t < 6;
+      }
+      return true;
+    });
+  }
+  dispose(scene: THREE.Scene) {
+    scene.remove(this.g);
+  }
+}

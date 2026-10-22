@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, BookOpen, Volume2, VolumeX, Settings as Gear, Keyboard } from 'lucide-react';
 import { Minimap, SettingsSheet, ControlsSheet, LanternSheet, loadSettings, saveSettings, type Settings } from './components/PcHud';
 import { TempleScene, type TimeOfDay } from './three/TempleScene';
@@ -13,7 +13,10 @@ import { LegendFilm } from './components/LegendFilm';
 import { useCalendar, CalendarChip, FestivalSheet, festivalKey, isFestivalDone, markFestivalDone } from './components/Calendar';
 import { liveTimeOfDay, today, type Festival } from './services/lunar';
 import { SECRETS, nextSecret } from './data/story';
-import { IncenseModal, AltarModal, XamModal, PetitionModal, StallModal } from './components/Rituals';
+import { AltarModal, PetitionModal, StallModal } from './components/Rituals';
+import { IncenseRitual, XamRitual } from './components/RitualStage';
+import { HauDongSight, type CeremonyControl } from './components/HauDongSight';
+import { daySchedule, hauDongState, fmtHour, hourOf } from './services/templeDay';
 import { KhanArt } from './components/LocArt';
 import { LuckChip, LuckToasts, CaptionBar, StoryCardSheet, LuckSheet } from './components/LuckAndLegends';
 import { VirtualJoystick } from './components/VirtualJoystick';
@@ -24,7 +27,7 @@ import { useBackLayer } from './services/backStack';
 import { PALACES, type PalaceId } from './data/story';
 import type { LocKind } from './data/rituals';
 
-type Modal = 'keeper' | 'incense' | 'altar' | 'fortune' | 'furnace' | 'stall' | 'journal' | 'settings' | 'controls' | 'lantern' | 'film' | 'calendar' | null;
+type Modal = 'keeper' | 'incense' | 'altar' | 'fortune' | 'furnace' | 'stall' | 'journal' | 'settings' | 'controls' | 'lantern' | 'film' | 'calendar' | 'haudong' | null;
 
 const PROMPT: Record<string, string> = {
   gate: 'Vái before the gate',
@@ -36,6 +39,7 @@ const PROMPT: Record<string, string> = {
   bell: 'Strike the great bell',
   stall: 'Receive lộc',
   river: 'Float a lantern',
+  haudong: 'Sit and watch the hầu đồng',
   theatre: 'Watch the legend of the Mothers',
 };
 
@@ -62,6 +66,13 @@ export default function App() {
   });
   const cal = useCalendar();
   const [festBanner, setFestBanner] = useState(false);
+  // the temple's day: bells, offerings and hầu đồng sessions on the visitor's clock
+  const sched = useMemo(() => daySchedule(cal.lunar.month, cal.lunar.day, cal.festival), [cal.lunar.month, cal.lunar.day, cal.festival]);
+  const hd = hauDongState(cal.now, sched);
+  const rung = useRef('');
+  const [watchCtl, setWatchCtl] = useState<CeremonyControl | null>(null);
+  const [gaze, setGaze] = useState(0);
+  const [vision, setVision] = useState(false);
   const [auto, setAuto] = useState(false);
   const [tour, setTour] = useState(false);
   const [muted, setMuted] = useState(soundService.getMuted());
@@ -111,6 +122,12 @@ export default function App() {
         if (first && SECRETS.some((x) => x.id === id)) setUnlocked(true);
       },
       onReady: () => setLoading(false),
+      onGaze: setGaze,
+      onVision: () => {
+        setVision(true);
+        soundService.playTempleGong();
+        window.setTimeout(() => setVision(false), 5200);
+      },
       onSpotClick: (id) => spotClick.current(id),
       onAim: setAim,
       onArrivalEnd: () => {
@@ -196,6 +213,34 @@ export default function App() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live, view, cal.now]);
+
+  // dev: open a ritual straight away (?ritual=incense|fortune|haudong)
+  useEffect(() => {
+    if (!import.meta.env.DEV || view !== 'temple') return;
+    const r = new URLSearchParams(location.search).get('ritual');
+    if (r) window.setTimeout(() => setModal(r as Modal), 1500);
+  }, [view]);
+
+  // the hầu đồng is held (and heard) only during its sessions
+  useEffect(() => {
+    if (view !== 'temple') return;
+    scene.current?.setCeremony(!!hd.on && !inRealm);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, !!hd.on, inRealm, loading]);
+
+  // the bells at dawn and dusk ring on their own
+  useEffect(() => {
+    if (view !== 'temple') return;
+    const h = hourOf(cal.now);
+    const bell = sched.find((x) => x.kind === 'bell' && h >= x.from && h < x.from + 1 / 30);
+    const key = bell ? `${cal.now.toDateString()}-${bell.from}` : '';
+    if (bell && rung.current !== key) {
+      rung.current = key;
+      soundService.playGreatBell();
+      showCaption(bell.from < 12 ? 'The morning bell. Bà Thủ Từ lights the first incense of the day.' : 'The evening bell. The lanterns are being lit.', 5);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, cal.now]);
 
   // decorations and crowds for today's festival
   useEffect(() => {
@@ -304,6 +349,17 @@ export default function App() {
     if (k === 'bell') return ringBell();
     if (k === 'river') return setModal('lantern');
     if (k === 'theatre') return setModal('film');
+    if (k === 'haudong') {
+      if (hd.on) {
+        const c = scene.current?.startWatching();
+        if (c) {
+          setWatchCtl(c);
+          setModal('haudong');
+        }
+        return;
+      }
+      return showCaption(hd.next ? `The mat is empty for now. The next hầu đồng begins at ${fmtHour(hd.next.from)}.` : 'The hall is quiet tonight. Hầu đồng is held again tomorrow morning.', 5);
+    }
     if (k === 'keeper' || k === 'incense' || k === 'altar' || k === 'fortune' || k === 'furnace' || k === 'stall' || k === 'lantern') setModal(k as Modal);
   };
 
@@ -319,9 +375,9 @@ export default function App() {
       else if ((e.key === 't' || e.key === 'T') && !modal) openJournal('trail');
       else if ((e.key === 'm' || e.key === 'M') && !modal) setSettings((st) => ({ ...st, minimap: !st.minimap }));
       else if (e.key === '?' && !modal) setModal('controls');
-      else if (e.key === '1') changeTime('day');
-      else if (e.key === '2') changeTime('twilight');
-      else if (e.key === '3') changeTime('night');
+      else if (e.key === '1' && !modal) changeTime('day');
+      else if (e.key === '2' && !modal) changeTime('twilight');
+      else if (e.key === '3' && !modal) changeTime('night');
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -398,10 +454,40 @@ export default function App() {
 
   return (
     <div className="fixed inset-0 bg-[#2a1410] overflow-hidden">
-      <div ref={mount} className="absolute inset-0 cursor-grab active:cursor-grabbing" />
+      <div ref={mount} className="absolute inset-0 cursor-grab active:cursor-grabbing" style={gaze > 0.02 ? { filter: 'url(#gaze-ripple)' } : undefined} />
+      {/* the gaze trap: the edges of the world blur and ripple like water */}
+      <svg width="0" height="0" className="absolute" aria-hidden>
+        <filter id="gaze-ripple">
+          <feTurbulence type="fractalNoise" baseFrequency="0.008 0.014" numOctaves={2} seed={3}>
+            <animate attributeName="baseFrequency" dur="5s" values="0.008 0.014;0.011 0.02;0.008 0.014" repeatCount="indefinite" />
+          </feTurbulence>
+          <feDisplacementMap in="SourceGraphic" scale={Math.round(gaze * 34)} xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </svg>
+      {gaze > 0.02 && (
+        <div
+          className="fixed inset-0 z-10 pointer-events-none"
+          style={{
+            backdropFilter: `blur(${(gaze * 9).toFixed(1)}px)`,
+            WebkitBackdropFilter: `blur(${(gaze * 9).toFixed(1)}px)`,
+            maskImage: 'radial-gradient(ellipse at center, transparent 38%, black 82%)',
+            WebkitMaskImage: 'radial-gradient(ellipse at center, transparent 38%, black 82%)',
+            background: `radial-gradient(ellipse at center, transparent 40%, rgba(120,10,10,${(gaze * 0.45).toFixed(2)}) 100%)`,
+          }}
+        />
+      )}
+      {vision && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none vision-in">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(255,200,120,.55),rgba(90,8,8,.85)_60%,rgba(0,0,0,.95))]" />
+          <div className="relative text-center px-6">
+            <div className="dh-title text-4xl sm:text-5xl text-[#fff1c4] drop-shadow-[0_0_30px_rgba(255,190,90,.9)]">Mẫu nhìn con</div>
+            <p className="mt-3 font-display italic text-lg text-[#f3d9a0]">For a moment, the Mother looks back. Then the trance lets you go.</p>
+          </div>
+        </div>
+      )}
 
       {/* top-left: back, place */}
-      <div className="fixed top-[max(0.75rem,env(safe-area-inset-top))] left-3 z-30 flex items-center gap-2">
+      <div className={`fixed top-[max(0.75rem,env(safe-area-inset-top))] left-3 z-30 flex items-center gap-2 ${modal === 'haudong' ? 'hidden' : ''}`}>
         <button
           onClick={() => (inRealm ? scene.current?.leaveLegend() : setView('landing'))}
           className="flex items-center gap-1.5 pl-2.5 pr-3.5 py-2 rounded-xl dh-paper border border-[#211a15] text-[#2a1d14] text-xs font-semibold shadow-md cursor-pointer hover:border-[#8e1b1b]"
@@ -419,7 +505,7 @@ export default function App() {
       </div>
 
       {/* top-right: phúc, scarves, journal, sound */}
-      <div className="fixed top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-30 flex items-center gap-1.5 sm:gap-2">
+      <div className={`fixed top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-30 flex items-center gap-1.5 sm:gap-2 ${modal === 'haudong' ? 'hidden' : ''}`}>
         <CalendarChip now={cal.now} lunar={cal.lunar} festival={cal.festival} onClick={() => setModal('calendar')} />
         <LuckChip onClick={() => setShowPhuc(true)} compact />
         <button onClick={() => openJournal()} className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-xl dh-paper border border-[#211a15] shadow-md cursor-pointer hover:border-[#8e1b1b]" aria-label={`Journal: ${story.khan.length} of 4 scarves`}>
@@ -451,10 +537,25 @@ export default function App() {
       </div>
 
       {/* objective tracker: story goal + the current secret's riddle */}
-      {!inRealm && !loading && !arriving && (
+      {!inRealm && !loading && !arriving && modal !== 'haudong' && (
         <div className={`fixed left-3 top-[calc(max(0.75rem,env(safe-area-inset-top))+3rem)] z-20 ${modal ? 'hidden sm:block' : ''}`}>
           <Tracker getDistance={getSecretDistance} isNight={time === 'night'} onOpenTrail={() => openJournal('trail')} onGuide={guide} />
         </div>
+      )}
+
+      {/* a hầu đồng is happening right now */}
+      {hd.on && !inRealm && !arriving && !modal && !festBanner && (
+        <button
+          onClick={() => {
+            const seat = spots.find((x) => x.id === 'seat');
+            if (seat) scene.current?.guideTo(seat.at[0], seat.at[1]);
+            showCaption('Chầu văn drifts from the main hall. The firefly shows you to the mat.', 4);
+          }}
+          className="fixed top-16 left-1/2 -translate-x-1/2 z-20 px-3 py-1.5 rounded-full dh-seal text-[12px] font-semibold cursor-pointer flex items-center gap-2"
+          title="Find the mat at the back of the courtyard"
+        >
+          <span className="w-2 h-2 rounded-full bg-[#ffd27a] animate-pulse" /> Hầu đồng now in the main hall · until {fmtHour(hd.on.to)}
+        </button>
       )}
 
       {/* today's festival */}
@@ -532,7 +633,7 @@ export default function App() {
       )}
 
       {/* PC: minimap under the top bar, crosshair while the mouse is captured, key hints */}
-      {!inRealm && !arriving && settings.minimap && spots.length > 0 && (
+      {!inRealm && !arriving && modal !== 'haudong' && settings.minimap && spots.length > 0 && (
         <div className="hidden lg:block fixed right-3 top-16 z-20">
           <Minimap spots={spots} getPlayer={getPlayer} onGo={(id) => scene.current?.teleportToSpot(id)} near={near?.id} />
         </div>
@@ -550,7 +651,7 @@ export default function App() {
         </div>
       )}
 
-      {!inRealm && !arriving && (
+      {!inRealm && !arriving && modal !== 'haudong' && (
         <Dock
           spots={spots}
           time={time}
@@ -607,12 +708,34 @@ export default function App() {
         />
       )}
       {modal === 'incense' && (
-        <IncenseModal
+        <IncenseRitual
           onClose={() => setModal(null)}
           onDone={(n) => {
             if (n % 2 === 0) luckService.change(-1, 'Incense is offered in odd numbers: one, three or five');
             else if (!visit.current.incense) luckService.change(2, `Lit ${n} stick${n > 1 ? 's' : ''} of incense with respect`);
             visit.current.incense = true;
+            scene.current?.bow();
+          }}
+        />
+      )}
+      {modal === 'haudong' && watchCtl && (
+        <HauDongSight
+          ctl={watchCtl}
+          onClose={() => {
+            scene.current?.stopWatching();
+            setWatchCtl(null);
+            setModal(null);
+          }}
+          onBlessed={() => {
+            const k = `pvt_hd_${new Date().toDateString()}`;
+            try {
+              if (!localStorage.getItem(k)) {
+                localStorage.setItem(k, '1');
+                luckService.change(2, 'Sat quietly through a hầu đồng and received lộc');
+              }
+            } catch {
+              /* ignore */
+            }
           }}
         />
       )}
@@ -631,7 +754,7 @@ export default function App() {
           }}
         />
       )}
-      {modal === 'fortune' && <XamModal onClose={() => setModal(null)} phuc={luckService.get().value} onDrawn={(n) => storyService.saveXam(n)} />}
+      {modal === 'fortune' && <XamRitual onClose={() => setModal(null)} phuc={luckService.get().value} onDrawn={(n) => storyService.saveXam(n)} />}
       {modal === 'furnace' && (
         <PetitionModal
           onClose={() => setModal(null)}
@@ -669,7 +792,7 @@ export default function App() {
         />
       )}
       {modal === 'film' && <LegendFilm onClose={() => setModal(null)} />}
-      {modal === 'calendar' && <FestivalSheet onClose={() => setModal(null)} now={cal.now} lunar={cal.lunar} festival={cal.festival} onActivity={doFestival} />}
+      {modal === 'calendar' && <FestivalSheet onClose={() => setModal(null)} now={cal.now} lunar={cal.lunar} festival={cal.festival} onActivity={doFestival} schedule={sched} />}
       {modal === 'journal' && <JournalSheet onWatchFilm={() => setModal('film')} initial={journalTab} onClose={() => setModal(null)} onOpenCard={(c) => setCard({ card: c, luck: 0, firstTime: false })} />}
 
       <LuckToasts />
