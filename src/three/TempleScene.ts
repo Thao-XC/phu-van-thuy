@@ -20,6 +20,9 @@ import type { Decor } from '../services/lunar';
 
 export type TimeOfDay = 'day' | 'twilight' | 'night';
 
+/** eye height of a 170 cm visitor: the eyes sit about 10 cm below the top of the head */
+const EYE = 1.6;
+
 export interface SceneCallbacks {
   onNearSpot?: (spotId: string | null, spotName: string | null, spotType: string | null) => void;
   /** encounter start / captions / end (with the legend card) */
@@ -126,7 +129,7 @@ export class TempleScene {
   private fade: { from: number; to: number; dur: number; t: number; then?: () => void } | null = null;
 
   // Player & Navigation
-  public playerPosition = new THREE.Vector3(0, 1.7, 30);
+  public playerPosition = new THREE.Vector3(0, EYE, 30);
   public playerRotationY = 0; // forward is -Z, i.e. toward the main hall
   public playerPitch = 0; // Look up/down
 
@@ -389,7 +392,7 @@ export class TempleScene {
     });
     this.bellObj = this.scene.getObjectByName('bell') ?? null;
     this.createParticles(this.particleKind);
-    this.playerPosition.set(res.spawn.x, 1.7 + this.ground(res.spawn.x, res.spawn.z), res.spawn.z);
+    this.playerPosition.set(res.spawn.x, EYE + this.ground(res.spawn.x, res.spawn.z), res.spawn.z);
     this.playerRotationY = res.spawn.rotY;
     this.setTimeOfDay('twilight');
   }
@@ -532,7 +535,7 @@ export class TempleScene {
     this.blindwalk = null;
     const spot = this.spots.find((s) => s.id === spotId);
     if (!spot) return;
-    this.playerPosition.set(spot.at[0], 1.7 + this.ground(spot.at[0], spot.at[1]), spot.at[1]);
+    this.playerPosition.set(spot.at[0], EYE + this.ground(spot.at[0], spot.at[1]), spot.at[1]);
     const dx = spot.look[0] - spot.at[0];
     const dz = spot.look[1] - spot.at[1];
     this.playerRotationY = Math.atan2(dx, dz) + Math.PI;
@@ -1055,7 +1058,7 @@ export class TempleScene {
       if (this.playerPosition.z === prevZ) this._vel.z = 0;
     }
     // follow the ground (stairs, slopes, bridges) with a little smoothing
-    const targetY = 1.7 + this.ground(this.playerPosition.x, this.playerPosition.z);
+    const targetY = EYE + this.ground(this.playerPosition.x, this.playerPosition.z);
     this.playerPosition.y += (targetY - this.playerPosition.y) * Math.min(1, delta * 12);
 
     // Smooth camera update
@@ -1247,7 +1250,7 @@ export class TempleScene {
       this.ambientFill.intensity = rt.env.ambient;
       if (this.petalParticles) this.petalParticles.visible = false;
       if (rt.underwater) this.createBubbles();
-      this.playerPosition.set(rt.enter.x, POCKET_Y + rt.ground(rt.enter.x, rt.enter.z) + 1.7, rt.enter.z);
+      this.playerPosition.set(rt.enter.x, POCKET_Y + rt.ground(rt.enter.x, rt.enter.z) + EYE, rt.enter.z);
       this.playerRotationY = rt.enter.rotY;
       this.playerPitch = 0;
       this.fadeTo(def.diveColor, 0, 1.0);
@@ -1359,7 +1362,7 @@ export class TempleScene {
     if (!this.enc) return;
     const def = this.enc.def;
     this.restoreFromEncounter();
-    this.playerPosition.set(def.exit.x, 1.7 + this.ground(def.exit.x, def.exit.z), def.exit.z);
+    this.playerPosition.set(def.exit.x, EYE + this.ground(def.exit.x, def.exit.z), def.exit.z);
     this.playerRotationY = def.exit.rotY;
     this.playerPitch = 0;
     this.encCooldown = 4;
@@ -1371,7 +1374,7 @@ export class TempleScene {
     if (!this.enc) return false;
     const def = this.enc.def;
     this.abortEncounter();
-    this.playerPosition.set(def.exit.x, 1.7 + this.ground(def.exit.x, def.exit.z), def.exit.z);
+    this.playerPosition.set(def.exit.x, EYE + this.ground(def.exit.x, def.exit.z), def.exit.z);
     this.playerRotationY = def.exit.rotY;
     this.playerPitch = 0;
     this.encCooldown = 4;
@@ -1606,7 +1609,7 @@ export class TempleScene {
   private finishArrival(fadeBack = false) {
     if (!this.arrival) return;
     this.arrival.done = true;
-    this.playerPosition.set(0, 1.7 + this.ground(0, 64), 64);
+    this.playerPosition.set(0, EYE + this.ground(0, 64), 64);
     this.playerRotationY = 0;
     this.playerPitch = 0;
     if (fadeBack) this.fadeTo(0x000000, 0, 0.6);
@@ -1729,7 +1732,7 @@ export class TempleScene {
       this.fogSave = null;
     }
     const x = 1.6, z = -7.2;
-    this.playerPosition.set(x, 1.7 + this.ground(x, z), z);
+    this.playerPosition.set(x, EYE + this.ground(x, z), z);
     this.playerRotationY = Math.atan2(x, z + 11);
     this.playerPitch = 0.08;
     this.kneelTarget = 0.75;
@@ -1767,7 +1770,7 @@ export class TempleScene {
       // stand up where you sat, still facing the stage
       // back on the path at the edge of the pond
       const p = this.puppetSeat.from;
-      this.playerPosition.set(p.x, 1.7 + this.ground(p.x, p.z), p.z);
+      this.playerPosition.set(p.x, EYE + this.ground(p.x, p.z), p.z);
       const d = this.puppetSeat.look.clone().sub(p);
       this.playerRotationY = Math.atan2(-d.x, -d.z);
       this.playerPitch = -0.05;
@@ -1791,7 +1794,7 @@ export class TempleScene {
   /** put the visitor back where they left off */
   public placePlayer(x: number, z: number, yaw: number) {
     if (this.walkable && !this.walkable(x, z)) return;
-    this.playerPosition.set(x, 1.7 + this.ground(x, z), z);
+    this.playerPosition.set(x, EYE + this.ground(x, z), z);
     this.playerRotationY = yaw;
   }
 
