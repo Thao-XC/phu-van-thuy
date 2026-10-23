@@ -112,6 +112,12 @@ class SoundService {
     this.noise(1.6, 400, 0.6, 0.25, 0.05);
   }
 
+  /** a paddle dipping and pulling through the water */
+  public playPaddle() {
+    this.noise(0.5, 900, 0.8, 0.12, 0.04, 'bandpass');
+    setTimeout(() => this.noise(0.7, 500, 0.7, 0.07, 0.1), 180);
+  }
+
   /** Rooster crow: a rising-falling sawtooth with vibrato */
   public playRooster() {
     if (this.isMuted) return;

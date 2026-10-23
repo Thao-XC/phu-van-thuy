@@ -935,7 +935,9 @@ export class TempleScene {
       return;
     }
     if (this.arrival && !this.arrival.done) {
-      this.arrival.update(delta, this.camera, this.arrivalLook);
+      // seated in the boat, hands resting on your knees; you may glance around with the mouse
+      this.arrival.update(delta, this.camera, this.playerRotationY, this.playerPitch);
+      this.hands?.pose(this.arrival.stepping ? 'hidden' : 'veil');
       if (this.arrival.done) this.finishArrival();
       return;
     }
@@ -1602,6 +1604,11 @@ export class TempleScene {
   /** open on a boat drifting up the river to the landing */
   public playArrival() {
     this.arrival = new Arrival(this.scene);
+    this.arrival.land.set(0, EYE + this.ground(0, 64), 64);
+    this.arrival.onSplash = () => soundService.playPaddle();
+    this.arrival.onStep = () => soundService.playFootstep();
+    this.playerRotationY = 0;
+    this.playerPitch = 0;
   }
   public skipArrival() {
     if (this.arriving) this.fadeTo(0x000000, 1, 0.3, () => this.finishArrival(true));
@@ -1609,6 +1616,7 @@ export class TempleScene {
   private finishArrival(fadeBack = false) {
     if (!this.arrival) return;
     this.arrival.done = true;
+    this.hands?.pose('hidden');
     this.playerPosition.set(0, EYE + this.ground(0, 64), 64);
     this.playerRotationY = 0;
     this.playerPitch = 0;

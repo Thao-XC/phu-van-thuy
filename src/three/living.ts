@@ -246,9 +246,9 @@ export class Arrival {
   readonly boat = new THREE.Group();
   private oar: THREE.Group;
   private t = 0;
-  readonly dur = 15;
+  readonly dur = 17;
   private from = new THREE.Vector3(-46, -0.35, 96);
-  private to = new THREE.Vector3(-1.5, -0.35, 69);
+  private to = new THREE.Vector3(-1.9, -0.35, 69.2);
   done = false;
 
   constructor(scene: THREE.Scene) {
@@ -272,7 +272,7 @@ export class Arrival {
     // bamboo canopy (mui)
     const mui = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 1.8, 12, 1, true, 0, Math.PI), new THREE.MeshStandardMaterial({ color: 0x9c7a46, roughness: 0.95, side: THREE.DoubleSide }));
     mui.rotation.z = Math.PI / 2;
-    mui.position.set(0.4, 0.2, 0);
+    mui.position.set(-0.9, 0.2, 0); // the canopy sits behind you; you ride up front
     this.boat.add(mui);
     // the boatwoman at the stern with a conical hat
     const woman = person({ sex: 'f', outfit: 'aonau', robe: 0x4a3828, under: 0x8a5a3b, trousers: 0x1c1714, hair: 'bun', hat: 'non', h: 1.52 });
@@ -292,8 +292,9 @@ export class Arrival {
     this.oar.position.set(-2.5, 0.8, 0.25);
     this.boat.add(this.oar);
     // a little lantern at the bow
-    const lantern = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), new THREE.MeshStandardMaterial({ color: 0xc81e1e, emissive: 0xff7a3a, emissiveIntensity: 0.9 }));
-    lantern.position.set(3.1, 0.75, 0);
+    // a small lantern hung low on the bow, out of your line of sight
+    const lantern = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), new THREE.MeshStandardMaterial({ color: 0xc81e1e, emissive: 0xff7a3a, emissiveIntensity: 0.9 }));
+    lantern.position.set(3.35, 0.42, 0.22);
     const ll = new THREE.PointLight(0xffa860, 1.2, 8, 2);
     ll.position.copy(lantern.position);
     this.boat.add(lantern, ll);
@@ -301,35 +302,90 @@ export class Arrival {
     scene.add(this.boat);
   }
 
-  /** 0..1 progress */
+  /** where you will stand on the landing when you step ashore (set by the scene) */
+  land = new THREE.Vector3(0, 1.6, 64);
+  /** the last seconds: you stand up in the boat and step onto the landing */
+  readonly stepDur = 3.4;
+  private splashT = 0;
+  private stepped = 0;
+  onSplash?: () => void;
+  onStep?: () => void;
+
+  /** 0..1 progress of the ride itself */
   get progress() {
-    return Math.min(1, this.t / this.dur);
+    return Math.min(1, this.t / (this.dur - this.stepDur));
+  }
+  get stepping() {
+    return this.t > this.dur - this.stepDur;
   }
 
-  update(dt: number, cam: THREE.PerspectiveCamera, look: THREE.Vector3) {
+  /**
+   * You ride in the boat, sitting on the thwart just ahead of the canopy, facing the bow.
+   * lookYaw / lookPitch are your own glances (mouse), added on top of where the boat points.
+   */
+  update(dt: number, cam: THREE.PerspectiveCamera, lookYaw = 0, lookPitch = 0) {
     this.t += dt;
     const p = this.progress;
     const e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
-    // the boat glides along a gentle curve toward the landing
     const bx = THREE.MathUtils.lerp(this.from.x, this.to.x, e) + Math.sin(e * Math.PI) * 6;
     const bz = THREE.MathUtils.lerp(this.from.z, this.to.z, e);
     const ahead = Math.min(1, e + 0.02);
     const nx = THREE.MathUtils.lerp(this.from.x, this.to.x, ahead) + Math.sin(ahead * Math.PI) * 6;
     const nz = THREE.MathUtils.lerp(this.from.z, this.to.z, ahead);
-    this.boat.position.set(bx, -0.3 + Math.sin(this.t * 1.3) * 0.05, bz);
-    this.boat.rotation.y = Math.atan2(-(nz - bz), nx - bx);
-    this.boat.rotation.z = Math.sin(this.t * 0.9) * 0.02;
-    this.oar.rotation.y = Math.sin(this.t * 1.6) * 0.5;
-    // camera: a wide shot from behind and above, settling into the bow as you arrive
-    const k = THREE.MathUtils.smoothstep(p, 0.35, 0.95);
-    const yaw = this.boat.rotation.y;
-    const back = new THREE.Vector3(-Math.cos(yaw), 0, Math.sin(yaw));
-    const wide = this.boat.position.clone().addScaledVector(back, 11).add(new THREE.Vector3(0, 4.2, 0)).add(new THREE.Vector3(Math.sin(yaw) * 5, 0, Math.cos(yaw) * 5));
-    const bow = this.boat.position.clone().addScaledVector(back, -2.2).add(new THREE.Vector3(0, 1.55, 0));
-    cam.position.lerpVectors(wide, bow, k);
-    look.lerpVectors(this.boat.position.clone().add(new THREE.Vector3(0, 1, 0)), new THREE.Vector3(0, 3.2, 40), Math.min(1, k * 1.3));
-    cam.lookAt(look);
-    if (p >= 1) this.done = true;
+    const calm = this.stepping ? 0.4 : 1;
+    this.boat.position.set(bx, -0.3 + Math.sin(this.t * 1.3) * 0.05 * calm, bz);
+    if (p < 0.995) this.boat.rotation.y = Math.atan2(-(nz - bz), nx - bx);
+    this.boat.rotation.z = Math.sin(this.t * 0.9) * 0.02 * calm; // pitching bow to stern
+    this.boat.rotation.x = Math.sin(this.t * 0.7 + 1) * 0.025 * calm; // rolling side to side
+    this.oar.rotation.y = this.stepping ? 0 : Math.sin(this.t * 1.6) * 0.5;
+    this.boat.updateMatrixWorld(true);
+    // the paddle dips: a splash every stroke
+    this.splashT += dt;
+    if (!this.stepping && this.splashT > 1.95) {
+      this.splashT = 0;
+      this.onSplash?.();
+    }
+
+    // sitting in the boat: eyes a little under a metre above the floorboards
+    const seat = this.boat.localToWorld(new THREE.Vector3(1.05, 0.98, 0));
+    const fwd = new THREE.Vector3(1, 0, 0).applyQuaternion(this.boat.quaternion);
+    const boatYaw = Math.atan2(-fwd.x, -fwd.z);
+    // toward the end you turn your head to the landing and the gate beyond it
+    const toTemple = Math.atan2(-(0 - seat.x), -(40 - seat.z));
+    let dYaw = toTemple - boatYaw;
+    dYaw = Math.atan2(Math.sin(dYaw), Math.cos(dYaw));
+    const turn = THREE.MathUtils.smoothstep(p, 0.6, 0.95);
+    const drift = Math.sin(this.t * 0.35) * 0.35 * (1 - turn); // looking around at the river and hills
+    let yaw = boatYaw + dYaw * turn + drift + lookYaw;
+    let pitch = -0.04 + lookPitch + this.boat.rotation.z * 0.6;
+    let roll = this.boat.rotation.x * 0.7;
+
+    if (!this.stepping) {
+      cam.position.copy(seat);
+    } else {
+      // stand up, steady yourself, and step across onto the landing, then walk to its middle
+      const k = (this.t - (this.dur - this.stepDur)) / this.stepDur;
+      const rise = THREE.MathUtils.smoothstep(k, 0, 0.3);
+      const walk = THREE.MathUtils.smoothstep(k, 0.3, 1);
+      const standing = seat.clone().add(new THREE.Vector3(0, 0.62 * rise, 0));
+      cam.position.lerpVectors(standing, this.land, walk);
+      // a step's rise and fall, three steps
+      cam.position.y += Math.abs(Math.sin(walk * Math.PI * 3)) * 0.05 * (walk > 0 && walk < 1 ? 1 : 0) - (k < 0.3 ? Math.sin(rise * Math.PI) * 0.04 : 0);
+      const steps = Math.floor(walk * 3 + 0.5);
+      if (steps > this.stepped) {
+        this.stepped = steps;
+        this.onStep?.();
+      }
+      // turn to face up the path to the temple (yaw 0 looks along -z)
+      const face = THREE.MathUtils.smoothstep(k, 0.15, 0.9);
+      let dy = 0 - yaw;
+      dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      yaw += dy * face;
+      pitch *= 1 - face;
+      roll *= 1 - rise;
+    }
+    cam.quaternion.setFromEuler(new THREE.Euler(pitch, yaw, roll, 'YXZ'));
+    if (this.t >= this.dur) this.done = true;
   }
 
   /** after you step ashore the boat drifts away and vanishes */
