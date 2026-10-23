@@ -379,6 +379,10 @@ export class TempleScene {
     this.firefly.onArrive = () => this.callbacks.onGuideArrive?.();
     this.firefly.attach(this.scene, this.playerPosition.clone().add(new THREE.Vector3(-1, 0, -1)));
     this.visitors = new Visitors(this.scene, this.ground);
+    // the boat you came on waits at the landing, to take you home whenever you like
+    this.arrival?.dispose();
+    this.arrival = new Arrival(this.scene);
+    this.arrival.moorNow();
     this.hall = new HallAtmosphere(this.scene, this.ground, {
       hallZ: WORLD.HALL.z,
       hallD: WORLD.HALL.d,
@@ -902,6 +906,36 @@ export class TempleScene {
    * Update Player Movement & Camera Position
    */
   private updatePlayerMovement(delta: number) {
+    if (this.departing && this.arrival) {
+      // into the boat, sit, and away down the river as the light goes
+      const d = this.departing;
+      d.t += delta;
+      const seat = this.arrival.seatWorld();
+      if (d.t < 1.6) {
+        const k = THREE.MathUtils.smoothstep(d.t, 0, 1.6);
+        this.camera.position.lerpVectors(d.from, seat, k);
+        if (d.t > 0.5 && !d.sat) {
+          d.sat = true;
+          soundService.playFootstep();
+        }
+      } else {
+        this.arrival.depart(delta, Math.min(1, (d.t - 1.6) / 4));
+        this.camera.position.copy(this.arrival.seatWorld());
+        if (d.t > 3.2 && !d.faded) {
+          d.faded = true;
+          soundService.playPaddle();
+          this.fadeTo(0x000000, 1, 2.2, () => {
+            const gone = d.onGone;
+            this.departing = null;
+            gone();
+          });
+        }
+      }
+      // look back at the temple as you go
+      const look = new THREE.Vector3(0, 4, 40);
+      this.camera.lookAt(look);
+      return;
+    }
     if (this.puppets && this.puppetSeat) {
       // on the bank of the pond, watching the stage
       const w = this.puppetSeat;
@@ -1598,11 +1632,21 @@ export class TempleScene {
   private visitors: Visitors | null = null;
   private arrival: Arrival | null = null;
   private arrivalLook = new THREE.Vector3();
+  private departing: { t: number; from: THREE.Vector3; onGone: () => void; sat?: boolean; faded?: boolean } | null = null;
+  /** walk down to the landing and take the boat home: the visit ends on the water */
+  public leaveByBoat(onGone: () => void) {
+    if (!this.arrival || this.departing) return;
+    this.cancelRite();
+    this.releasePointer();
+    this.hands?.pose('hidden');
+    this.departing = { t: 0, from: this.camera.position.clone(), onGone };
+  }
   public get arriving() {
     return !!this.arrival && !this.arrival.done;
   }
   /** open on a boat drifting up the river to the landing */
   public playArrival() {
+    this.arrival?.dispose();
     this.arrival = new Arrival(this.scene);
     this.arrival.land.set(0, EYE + this.ground(0, 64), 64);
     this.arrival.onSplash = () => soundService.playPaddle();
@@ -1880,7 +1924,7 @@ export class TempleScene {
       const d = Math.hypot(this.playerPosition.x, this.playerPosition.z + 10);
       soundService.setChauVanVolume(this.enc || this.watching ? 0 : Math.max(0, Math.min(1, 1.15 - d / 38)));
     }
-    if (this.arrival?.done) this.arrival.leave(dt);
+    if (this.arrival?.done && !this.departing) this.arrival.moor(t);
   }
 
   /* ---------------- the secret trail ---------------- */

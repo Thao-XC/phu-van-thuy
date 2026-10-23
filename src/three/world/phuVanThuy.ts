@@ -55,6 +55,8 @@ export const phuVanThuy: Layout = (ctx) => {
       const base = 2.4 * t * Math.max(0, Math.min(1, (6 - z) / 6));
       return base + Math.max(0, -34 - x) * 1.2;
     }
+    // the landing stage, out over the water
+    if (Math.abs(x) < 2.5 && z > 61.5 && z < 68) return 0.05;
     // pond bed
     if (inPond(x, z)) return -1.2 * (1 - Math.hypot(x - POND.x, z - POND.z) / POND.r);
     // river bank
@@ -309,6 +311,7 @@ export const phuVanThuy: Layout = (ctx) => {
     { id: 'altar', type: 'altar', name: 'Altar of the Four Palaces', vi: 'Ban thờ Tứ phủ', at: [0, -9.4], look: [0, -15], r: 3.6 },
     { id: 'fortune', type: 'fortune', name: 'Fortune sticks', vi: 'Xin xăm', at: [6.8, -9], look: [8.8, -9], r: 2.4 },
     { id: 'bell', type: 'bell', name: 'Bell tower', vi: 'Gác chuông', at: [18, -8], look: [BELL.x, BELL.z] },
+    { id: 'ferry', type: 'ferry', name: 'The boat home', vi: 'Bến đò', at: [-0.4, 67.1], look: [-1.9, 69.2], r: 1.7 },
     { id: 'river', type: 'river', name: 'Lantern landing', vi: 'Bến thả đèn', at: [0, 63], look: [0, 74], r: 3.4 },
     { id: 'seat', type: 'haudong', name: 'Hầu đồng mat', vi: 'Chiếu xem hầu đồng', at: [-3.4, -6.6], look: [0, -11], r: 2.2 },
     { id: 'theatre', type: 'theatre', name: 'Water-puppet pavilion', vi: 'Thủy đình', at: [-7, 54.6], look: [-18.6, 53.6], r: 3.4 },
@@ -341,9 +344,10 @@ export const phuVanThuy: Layout = (ctx) => {
   return {
     spots,
     spawn: { x: 0, z: 62, rotY: 0 },
-    bounds: { x0: -31, x1: 31, z0: -24, z1: 64 },
+    bounds: { x0: -31, x1: 31, z0: -24, z1: 67.6 },
     walkable: (x, z) => {
       if (walls(x, z)) return false;
+      if (z > 63.8 && Math.abs(x) > 2.3) return false; // the river either side of the landing stage
       if (Math.hypot(x - BANYAN.x, z - BANYAN.z) < 2.3) return false;
       if (Math.hypot(x, z - 14) < 1.25) return false; // incense burner
       if (Math.abs(x - 14) < 1.6 && Math.abs(z - 10) < 1.6) return false; // furnace

@@ -14,7 +14,7 @@ export interface SpotDef extends Anchor {
   /** trigger radius (default 4.5) */
   r?: number;
 }
-export type SpotType = 'gate' | 'keeper' | 'incense' | 'altar' | 'fortune' | 'furnace' | 'bell' | 'stall' | 'river' | 'theatre' | 'haudong' | 'view';
+export type SpotType = 'gate' | 'keeper' | 'incense' | 'altar' | 'fortune' | 'furnace' | 'bell' | 'stall' | 'river' | 'theatre' | 'haudong' | 'view' | 'ferry';
 
 export type GroundFn = (x: number, z: number) => number;
 

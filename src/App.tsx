@@ -35,6 +35,7 @@ type Modal = 'keeper' | 'incense' | 'altar' | 'fortune' | 'furnace' | 'stall' | 
 
 const PROMPT: Record<string, string> = {
   gate: 'Vái before the gate',
+  ferry: 'Take the boat home',
   keeper: 'Talk to Bà Thủ Từ',
   incense: 'Light incense',
   altar: 'Pray at the altar',
@@ -80,6 +81,8 @@ export default function App() {
   const possessBus = useMemo(() => createPossessBus(), []);
   const [possessing, setPossessing] = useState(false);
   const [touchWarn, setTouchWarn] = useState(0);
+  // taking the boat home: the HUD steps aside
+  const [leaving, setLeaving] = useState(false);
   // the key list shows for 20 seconds after arriving, then steps out of the way
   const [keysHint, setKeysHint] = useState(true);
   // talking to Bà Thủ Từ: face her, and keep her bubble over her head
@@ -403,6 +406,14 @@ export default function App() {
   const openRitualRef = useRef<(k: string) => void>(() => {});
   const openRitual = (k: RitualKey | string) => {
     if (k === 'gate') return scene.current?.bow();
+    if (k === 'ferry') {
+      setLeaving(true);
+      if (scene.current) scene.current.inputEnabled = false;
+      return scene.current?.leaveByBoat(() => {
+        setLeaving(false);
+        setView('landing');
+      });
+    }
     if (k === 'bell') return ringBell();
     if (k === 'river') return setModal('lantern');
     if (k === 'theatre') {
@@ -436,7 +447,7 @@ export default function App() {
   useEffect(() => {
     if (view !== 'temple') return;
     const onKey = (e: KeyboardEvent) => {
-      if (rite || possessing) return;
+      if (rite || possessing || leaving) return;
       if (document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement) return;
       if ((e.key === 'e' || e.key === 'E' || e.key === 'Enter' || e.key === ' ') && near && !modal && !card && !inRealm && !arriving) {
         e.preventDefault();
@@ -825,7 +836,7 @@ export default function App() {
       )}
 
       {/* what Space does here: a quiet hint, not a button */}
-      {!inRealm && !arriving && !rite && !possessing && near && !modal && PROMPT[near.type] && (
+      {!inRealm && !arriving && !rite && !possessing && !leaving && near && !modal && PROMPT[near.type] && (
         <div className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 pl-1.5 pr-3 py-1 rounded-full bg-[#140b08]/60 backdrop-blur-sm text-[#fbeed2] text-[13px] pointer-events-none">
           <kbd className="px-1.5 py-0.5 rounded bg-[#b8382b] text-[11px] font-bold text-[#f3ead6]">Space</kbd>
           {PROMPT[near.type]}

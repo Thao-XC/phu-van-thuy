@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { person, walk, pray, rest, type Person, type PersonOpts } from './kit/people';
+import { makeBoat } from './kit/boat';
 
 /**
  * The temple's life: a firefly spirit guide, other visitors going about their prayers,
@@ -251,55 +252,51 @@ export class Arrival {
   private to = new THREE.Vector3(-1.9, -0.35, 69.2);
   done = false;
 
-  constructor(scene: THREE.Scene) {
-    const wood = new THREE.MeshStandardMaterial({ color: 0x5b3b22, roughness: 0.85 });
-    const dark = new THREE.MeshStandardMaterial({ color: 0x3a2617, roughness: 0.9 });
-    // hull: a flat bottom, sides leaning out, pointed bow and stern
-    const bottom = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.12, 0.9), wood);
-    this.boat.add(bottom);
-    [-1, 1].forEach((sd) => {
-      const side = new THREE.Mesh(new THREE.BoxGeometry(5.8, 0.46, 0.08), wood);
-      side.position.set(0, 0.22, sd * 0.5);
-      side.rotation.x = sd * 0.28;
-      this.boat.add(side);
-      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.52, 1.3, 4), wood);
-      tip.rotation.z = sd * -Math.PI / 2;
-      tip.rotation.x = Math.PI / 4;
-      tip.position.set(sd * 3.4, 0.2, 0);
-      tip.scale.set(1, 1, 0.75);
-      this.boat.add(tip);
-    });
-    // bamboo canopy (mui)
-    const mui = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 1.8, 12, 1, true, 0, Math.PI), new THREE.MeshStandardMaterial({ color: 0x9c7a46, roughness: 0.95, side: THREE.DoubleSide }));
-    mui.rotation.z = Math.PI / 2;
-    mui.position.set(-0.9, 0.2, 0); // the canopy sits behind you; you ride up front
-    this.boat.add(mui);
-    // the boatwoman at the stern with a conical hat
+  private seatEye: THREE.Vector3;
+  constructor(private scene: THREE.Scene) {
+    const b = makeBoat();
+    this.boat.add(b.g);
+    this.oar = b.oar;
+    this.seatEye = b.seatEye;
+    // the boatwoman stands at the stern, facing forward, working the long oar
     const woman = person({ sex: 'f', outfit: 'aonau', robe: 0x4a3828, under: 0x8a5a3b, trousers: 0x1c1714, hair: 'bun', hat: 'non', h: 1.52 });
-    woman.position.set(-2.6, -0.06, 0);
-    woman.rotation.y = Math.PI / 2;
-    // both hands on the oar
+    woman.position.set(-2.6, -0.08, -0.12);
+    woman.rotation.y = Math.PI / 2 + 0.35;
     woman.userData.j.arms.forEach((a, i) => {
-      a.sh.rotation.set(-0.9, 0, (i ? -1 : 1) * 0.35);
-      a.el.rotation.set(-0.7, 0, 0);
+      a.sh.rotation.set(-0.95, 0, (i ? -1 : 1) * 0.15);
+      a.el.rotation.set(-0.55, 0, 0);
     });
+    this.woman = woman;
     this.boat.add(woman);
-    this.oar = new THREE.Group();
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 3, 6), dark);
-    shaft.rotation.z = 1.1;
-    shaft.position.set(-0.6, 0.6, 0);
-    this.oar.add(shaft);
-    this.oar.position.set(-2.5, 0.8, 0.25);
-    this.boat.add(this.oar);
-    // a little lantern at the bow
-    // a small lantern hung low on the bow, out of your line of sight
-    const lantern = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), new THREE.MeshStandardMaterial({ color: 0xc81e1e, emissive: 0xff7a3a, emissiveIntensity: 0.9 }));
-    lantern.position.set(3.35, 0.42, 0.22);
-    const ll = new THREE.PointLight(0xffa860, 1.2, 8, 2);
-    ll.position.copy(lantern.position);
-    this.boat.add(lantern, ll);
-    this.boat.traverse((o) => ((o as THREE.Mesh).castShadow = true));
     scene.add(this.boat);
+  }
+  private woman: Person;
+  /** tie up at the landing straight away (for visits that skip the ride) */
+  moorNow() {
+    this.t = this.dur;
+    this.done = true;
+    const e = 1, ahead = 0.98;
+    const bx = this.to.x, bz = this.to.z;
+    const px = THREE.MathUtils.lerp(this.from.x, this.to.x, ahead) + Math.sin(ahead * Math.PI) * 6;
+    const pz = THREE.MathUtils.lerp(this.from.z, this.to.z, ahead);
+    void e;
+    this.boat.position.set(bx, -0.3, bz);
+    this.boat.rotation.y = Math.atan2(-(bz - pz), bx - px);
+  }
+  /** waiting at the landing: rocking a little on the current */
+  moor(t: number) {
+    this.boat.position.y = -0.3 + Math.sin(t * 1.1) * 0.03;
+    this.boat.rotation.z = Math.sin(t * 0.8) * 0.012;
+    this.boat.rotation.x = Math.sin(t * 0.6 + 1) * 0.015;
+    this.oar.rotation.y = Math.sin(t * 0.4) * 0.08;
+  }
+  /** where a seated passenger's eyes are, in the world */
+  seatWorld() {
+    this.boat.updateMatrixWorld(true);
+    return this.boat.localToWorld(this.seatEye.clone());
+  }
+  dispose() {
+    this.scene.remove(this.boat);
   }
 
   /** where you will stand on the landing when you step ashore (set by the scene) */
@@ -347,7 +344,7 @@ export class Arrival {
     }
 
     // sitting in the boat: eyes a little under a metre above the floorboards
-    const seat = this.boat.localToWorld(new THREE.Vector3(1.05, 0.98, 0));
+    const seat = this.boat.localToWorld(this.seatEye.clone());
     const fwd = new THREE.Vector3(1, 0, 0).applyQuaternion(this.boat.quaternion);
     const boatYaw = Math.atan2(-fwd.x, -fwd.z);
     // toward the end you turn your head to the landing and the gate beyond it
@@ -388,11 +385,14 @@ export class Arrival {
     if (this.t >= this.dur) this.done = true;
   }
 
-  /** after you step ashore the boat drifts away and vanishes */
-  leave(dt: number) {
-    this.boat.position.x += dt * 2.2;
-    this.boat.position.z += dt * 0.6;
-    if (this.boat.position.x > 60) this.boat.visible = false;
+  /** going home: the boat backs off the landing and heads out the way it came */
+  depart(dt: number, k: number) {
+    const yaw = this.boat.rotation.y;
+    const fwd = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+    // reverse off the landing, then swing round and away
+    this.boat.position.addScaledVector(fwd, -dt * (0.6 + k * 2.4));
+    this.boat.rotation.y += dt * 0.25 * Math.min(1, k * 2);
+    this.oar.rotation.y = Math.sin(k * 30) * 0.5;
   }
 }
 
