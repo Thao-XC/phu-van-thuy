@@ -21,7 +21,7 @@ const P = (x: number, y: number, z: number, rx: number, ry: number, rz: number, 
   curl,
 });
 export type PoseName = 'hidden' | 'joined' | 'raised' | 'light' | 'plant' | 'tube' | 'receive' | 'slip' | 'coins' | 'spread' | 'veil';
-const POSES: Record<PoseName, [HandPose, HandPose]> = {
+export const POSES: Record<PoseName, [HandPose, HandPose]> = {
   hidden: [P(-0.2, -0.95, -0.3, 0, 0, 0), P(0.2, -0.95, -0.3, 0, 0, 0)],
   // chắp tay: palms together, fingers up, in front of the chest
   joined: [P(-0.021, -0.19, -0.36, Math.PI / 2 - 0.22, -Math.PI / 2, 0, 0.05), P(0.021, -0.19, -0.36, Math.PI / 2 - 0.22, Math.PI / 2, 0, 0.05)],
@@ -45,42 +45,149 @@ const POSES: Record<PoseName, [HandPose, HandPose]> = {
   veil: [P(-0.15, -0.25, -0.44, -0.55, 0.15, 0, 0.45), P(0.15, -0.25, -0.44, -0.55, -0.15, 0, 0.45)],
 };
 
+/* skin that catches the light softly, and a fabric weave for the sleeve */
+let _weave: THREE.CanvasTexture | null = null;
+function weave() {
+  if (_weave) return _weave;
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#fff';
+  g.fillRect(0, 0, 64, 64);
+  for (let i = 0; i < 64; i += 2) {
+    g.fillStyle = `rgba(0,0,0,${0.04 + Math.random() * 0.04})`;
+    g.fillRect(0, i, 64, 1);
+  }
+  // a few soft folds running down the sleeve
+  for (let i = 0; i < 6; i++) {
+    const x = Math.random() * 64;
+    const gr = g.createLinearGradient(x - 4, 0, x + 4, 0);
+    gr.addColorStop(0, 'rgba(0,0,0,0)');
+    gr.addColorStop(0.5, 'rgba(0,0,0,.12)');
+    gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr;
+    g.fillRect(x - 4, 0, 8, 64);
+  }
+  _weave = new THREE.CanvasTexture(c);
+  _weave.wrapS = _weave.wrapT = THREE.RepeatWrapping;
+  _weave.colorSpace = THREE.SRGBColorSpace;
+  return _weave;
+}
+
+/**
+ * A hand with real anatomy: a tapered palm with a soft thenar pad, four fingers of three
+ * joints each (index to little finger running away from the thumb, each a little splayed),
+ * a two-jointed thumb, fingernails, knuckles. Palm faces -y at rest, fingers point -z;
+ * curling bends every joint toward the palm.
+ */
 function makeHand(side: 1 | -1, sleeveColor: number) {
-  const skin = new THREE.MeshStandardMaterial({ color: SKIN, roughness: 0.62 });
-  const sleeve = new THREE.MeshStandardMaterial({ color: sleeveColor, roughness: 0.85, side: THREE.DoubleSide });
-  const cuff = new THREE.MeshStandardMaterial({ color: 0xece4d2, roughness: 0.8, side: THREE.DoubleSide });
+  const skin = new THREE.MeshPhysicalMaterial({ color: SKIN, roughness: 0.52, sheen: 0.5, sheenColor: new THREE.Color(0xffb8a0), sheenRoughness: 0.55 });
+  const nailMat = new THREE.MeshStandardMaterial({ color: 0xf2cfc0, roughness: 0.25, metalness: 0 });
+  const sleeve = new THREE.MeshStandardMaterial({ color: sleeveColor, roughness: 0.82, side: THREE.DoubleSide, map: weave() });
+  const cuff = new THREE.MeshStandardMaterial({ color: 0xece4d2, roughness: 0.75 });
   const hand = new THREE.Group();
-  const palm = new THREE.Mesh(new THREE.BoxGeometry(0.078, 0.024, 0.088), skin);
-  palm.position.z = -0.044;
-  hand.add(palm);
-  const heel = new THREE.Mesh(new THREE.SphereGeometry(0.039, 12, 8), skin);
-  heel.scale.set(1.05, 0.4, 0.9);
-  heel.position.z = -0.012;
-  hand.add(heel);
-  const fingers: THREE.Group[] = [];
-  [-0.029, -0.0095, 0.0095, 0.029].forEach((x, i) => {
-    const pivot = new THREE.Group();
-    pivot.position.set(x * side, 0.002, -0.086);
-    const len = [0.055, 0.07, 0.074, 0.062][side === 1 ? i : 3 - i];
-    const f = new THREE.Mesh(new THREE.CapsuleGeometry(0.0082, len, 3, 8), skin);
-    f.rotation.x = Math.PI / 2;
-    f.position.z = -len / 2 - 0.006;
-    pivot.add(f);
-    hand.add(pivot);
-    fingers.push(pivot);
+  // built palm-down (-y) and mirrored, so the palm faces +y the way the poses were authored
+  const inner = new THREE.Group();
+  inner.scale.y = -1;
+  hand.add(inner);
+  const add = (geo: THREE.BufferGeometry, mat: THREE.Material, parent: THREE.Object3D, x = 0, y = 0, z = 0) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    parent.add(m);
+    return m;
+  };
+
+  // palm: an ellipsoid, wide at the knuckles and narrowing to the wrist, a touch cupped
+  // one smooth palm: tapered to the wrist, padded under the thumb (thenar) and at the heel
+  const pg = new THREE.SphereGeometry(1, 36, 24);
+  const pos = pg.attributes.position as THREE.BufferAttribute;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const w = 1 - Math.max(0, z) * 0.2;
+    let yy = y * 0.0145;
+    if (y < 0) {
+      // palm side: the thenar mound toward the thumb, the heel toward the wrist, a hollow in the middle
+      const tx = x + 0.55 * side, tz = z - 0.35;
+      yy -= 0.0085 * Math.exp(-(tx * tx + tz * tz) / 0.12) * -y;
+      yy -= 0.005 * Math.exp(-((x - 0.25 * side) ** 2 + (z - 0.75) ** 2) / 0.1) * -y;
+      yy += 0.003 * Math.exp(-(x * x + z * z) / 0.15) * -y;
+    } else yy += 0.002 * Math.exp(-((z + 0.85) ** 2) / 0.02) * y; // knuckle ridge
+    pos.setXYZ(i, x * 0.041 * w, yy, z * 0.05);
+  }
+  pg.computeVertexNormals();
+  add(pg, skin, inner, 0, 0, -0.046);
+  // wrist, so the hand flows into the forearm
+  const wr = add(new THREE.SphereGeometry(0.025, 20, 14), skin, inner, 0, 0, 0.008);
+  wr.scale.set(1.15, 0.68, 1.1);
+
+  // fingers: index, middle, ring, little, away from the thumb
+  const LEN = [0.07, 0.078, 0.073, 0.057];
+  const RAD = [0.0086, 0.0089, 0.0083, 0.0072];
+  const XS = [-0.028, -0.0094, 0.0094, 0.027];
+  const ZS = [-0.087, -0.091, -0.088, -0.08];
+  const SPLAY = [0.07, 0.01, -0.05, -0.13];
+  const fingers: THREE.Group[][] = [];
+  XS.forEach((x0, i) => {
+    const segs: THREE.Group[] = [];
+    let parent: THREE.Object3D = inner;
+    const parts = [0.46, 0.3, 0.24];
+    parts.forEach((f, k) => {
+      const piv = new THREE.Group();
+      if (k === 0) {
+        piv.position.set(x0 * side, 0.001, ZS[i]);
+        piv.rotation.y = SPLAY[i] * side;
+        // the knuckle
+        add(new THREE.SphereGeometry(RAD[i] * 1.06, 12, 10), skin, inner, x0 * side, 0.001, ZS[i] + 0.007);
+      } else piv.position.z = -LEN[i] * parts[k - 1];
+      parent.add(piv);
+      const len = LEN[i] * f;
+      const r = RAD[i] * [1, 0.92, 0.84][k];
+      const seg = add(new THREE.CapsuleGeometry(r, len + r * 0.6, 4, 12), skin, piv, 0, 0, -len / 2);
+      seg.rotation.x = Math.PI / 2;
+      seg.scale.set(1.04, 1, 0.84);
+      if (k === 2) {
+        const nail = add(new THREE.SphereGeometry(r * 0.82, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), nailMat, piv, 0, r * 0.62, -len * 0.62);
+        nail.scale.set(1, 0.35, 1.25);
+      }
+      segs.push(piv);
+      parent = piv;
+    });
+    fingers.push(segs);
   });
+  // thumb: out from the heel of the palm, angled across it
   const thumb = new THREE.Group();
-  thumb.position.set(-0.043 * side, -0.004, -0.028);
-  const tm = new THREE.Mesh(new THREE.CapsuleGeometry(0.0095, 0.048, 3, 8), skin);
-  tm.rotation.x = Math.PI / 2;
-  tm.position.z = -0.03;
-  thumb.add(tm);
-  thumb.rotation.y = 0.55 * side;
-  hand.add(thumb);
-  const fore = new THREE.Mesh(new THREE.CylinderGeometry(0.027, 0.033, 1, 10), skin);
-  const sl = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.075, 1, 14, 1, true), sleeve);
-  const cf = new THREE.Mesh(new THREE.CylinderGeometry(0.062, 0.062, 0.03, 14, 1, true), cuff);
-  return { hand, fingers, thumb, fore, sl, cf, sleeve };
+  thumb.position.set(-0.034 * side, -0.006, -0.03);
+  thumb.rotation.set(0.15, 0.6 * side, -0.45 * side);
+  inner.add(thumb);
+  const tseg: THREE.Group[] = [];
+  let tp: THREE.Object3D = thumb;
+  [0.036, 0.03].forEach((len, k) => {
+    const piv = new THREE.Group();
+    if (k) piv.position.z = -0.036;
+    tp.add(piv);
+    const r = [0.0112, 0.0098][k];
+    const seg = add(new THREE.CapsuleGeometry(r, len, 4, 12), skin, piv, 0, 0, -len / 2);
+    seg.rotation.x = Math.PI / 2;
+    seg.scale.set(1, 1, 0.88);
+    if (k === 1) {
+      const nail = add(new THREE.SphereGeometry(r * 0.85, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), nailMat, piv, 0, r * 0.6, -len * 0.6);
+      nail.scale.set(1, 0.35, 1.2);
+    }
+    tseg.push(piv);
+    tp = piv;
+  });
+
+  // forearm: slim at the wrist, fuller toward the elbow
+  const fore = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.027, 1, 20, 1, true), skin);
+  // sleeve of the áo, falling loosely, with a turned-back cuff and a red thread at the wrist
+  const sl = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.06, 1, 22, 1, true), sleeve);
+  const cfGeo = new THREE.TorusGeometry(0.061, 0.007, 8, 28);
+  cfGeo.rotateX(Math.PI / 2);
+  const cf = new THREE.Mesh(cfGeo, cuff);
+  cf.userData.noStretch = true;
+  const thread = add(new THREE.TorusGeometry(0.0262, 0.0017, 6, 28), new THREE.MeshStandardMaterial({ color: 0xb3261e, roughness: 0.6 }), inner, 0, 0.001, 0.02);
+  thread.scale.set(1.12, 0.74, 1);
+  return { hand, fingers, thumb, tseg, fore, sl, cf, sleeve };
 }
 
 function stretch(m: THREE.Object3D, a: THREE.Vector3, b: THREE.Vector3) {
@@ -139,15 +246,26 @@ export class Hands {
       c.curl += (t.curl - c.curl) * k;
       x.hand.position.copy(c.p).add(this.offset);
       x.hand.quaternion.copy(c.q);
-      x.fingers.forEach((f, j) => (f.rotation.x = c.curl * (1.35 + j * 0.05)));
-      x.thumb.rotation.x = c.curl * 0.6;
+      // every joint bends toward the palm; the little finger always a touch more relaxed
+      x.fingers.forEach((segs, j) => {
+        // a relaxed hand curls a little; a flat, joined hand doesn't
+        const rest = (0.08 + j * 0.035) * Math.min(1, c.curl / 0.2);
+        segs[0].rotation.x = -(c.curl * (0.62 + j * 0.04) + rest);
+        segs[1].rotation.x = -(c.curl * 0.78 + rest * 1.4);
+        segs[2].rotation.x = -(c.curl * 0.52 + rest);
+      });
+      x.tseg[0].rotation.x = -c.curl * 0.35;
+      x.tseg[1].rotation.x = -(c.curl * 0.5 + 0.12);
       // forearm and sleeve back to an elbow below the view
       const side = i === 0 ? -1 : 1;
       const wrist = x.hand.position.clone().add(new THREE.Vector3(0, 0, 0.012).applyQuaternion(c.q));
       const elbow = new THREE.Vector3(side * 0.2, -0.62, -0.02).add(this.offset);
       stretch(x.fore, wrist, wrist.clone().lerp(elbow, 0.45));
       stretch(x.sl, wrist.clone().lerp(elbow, 0.18), elbow.clone().add(new THREE.Vector3(side * 0.04, -0.2, 0.1)));
-      stretch(x.cf, wrist.clone().lerp(elbow, 0.16), wrist.clone().lerp(elbow, 0.2));
+      // the cuff ring sits where the sleeve begins
+      const cuffAt = wrist.clone().lerp(elbow, 0.18);
+      x.cf.position.copy(cuffAt);
+      x.cf.quaternion.copy(x.sl.quaternion);
       if (c.p.y > -0.8) vis = true;
     });
     this.rig.visible = vis;
