@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { robedFigure } from './encounters/figures';
+import { person, walk, pray, rest, type Person, type PersonOpts } from './kit/people';
 
 /**
  * The temple's life: a firefly spirit guide, other visitors going about their prayers,
@@ -121,13 +121,26 @@ interface Stop {
   pray?: number;
 }
 interface Visitor {
-  fig: THREE.Group;
+  fig: Person;
   route: Stop[];
   i: number;
   wait: number;
   phase: number;
+  walk: number;
 }
 
+/** who comes to the temple: grandmothers in áo nâu and khăn vấn, women in áo dài, men in áo the and khăn xếp */
+const LOOKS: Omit<PersonOpts, 'robe'>[] = [
+  { sex: 'f', elder: true, outfit: 'aonau', hair: 'khanvan', under: 0x8a5a3b },
+  { sex: 'm', elder: true, outfit: 'aothe', hair: 'khanxep' },
+  { sex: 'f', outfit: 'aodai', hair: 'bun' },
+  { sex: 'f', outfit: 'aodai', hair: 'long' },
+  { sex: 'm', outfit: 'aothe', hair: 'short', trousers: 0x2a2620 },
+  { sex: 'f', elder: true, outfit: 'aonau', hair: 'khanvan', hat: 'non', under: 0x6b4a2e },
+  { sex: 'f', outfit: 'aodai', hair: 'bun' },
+  { sex: 'm', outfit: 'aothe', hair: 'khanxep' },
+];
+const LOOK_COLORS = [0x5b3a2a, 0x1f2a3e, 0xb8382b, 0xf1ead8, 0x34507a, 0x6b4a2e, 0x3f8a5a, 0x2a2420];
 const ROUTES: { robe: number; under: number; h: number; route: Stop[] }[] = [
   {
     robe: 0x6b4a2e,
@@ -165,18 +178,13 @@ export class Visitors {
   }
   constructor(scene: THREE.Scene, private ground: Ground) {
     [...ROUTES, ...ROUTES.map((r, i) => ({ ...r, robe: [0xb8382b, 0x8a5a3b, 0x2f5a7a, 0xe2b33b][i], route: [...r.route].reverse() }))].forEach((r, k) => {
-      const fig = robedFigure({ robe: r.robe, under: r.under, h: r.h, hat: 'none' });
-      // khăn vấn turban
-      const khan = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.05, 6, 14), new THREE.MeshStandardMaterial({ color: r.under === 0xf1ead8 ? 0x2a2a2a : r.under, roughness: 0.8 }));
-      khan.rotation.x = Math.PI / 2;
-      khan.position.y = 1.52 * (r.h / 1.7);
-      fig.add(khan);
-      fig.traverse((o) => ((o as THREE.Mesh).castShadow = true));
+      const look = LOOKS[k % LOOKS.length];
+      const fig = person({ ...look, robe: LOOK_COLORS[k % LOOK_COLORS.length], h: look.sex === 'm' ? r.h + 0.06 : r.h - 0.02 });
       const s = r.route[k % r.route.length];
       fig.position.set(s.x, ground(s.x, s.z), s.z);
       scene.add(fig);
       if (k >= ROUTES.length) fig.userData.hidden = true;
-      this.list.push({ fig, route: r.route, i: (k * 3) % r.route.length, wait: 1 + k, phase: k * 1.3 });
+      this.list.push({ fig, route: r.route, i: (k * 3) % r.route.length, wait: 1 + k, phase: k * 1.3, walk: 0 });
     });
   }
   update(dt: number, t: number, player: THREE.Vector3, visible: boolean) {
@@ -186,16 +194,20 @@ export class Visitors {
       const stop = v.route[v.i];
       if (v.wait > 0) {
         v.wait -= dt;
-        // bowing with joined hands while praying
-        v.fig.rotation.x = stop.pray ? Math.max(0, Math.sin(t * 1.4 + v.phase)) * 0.32 : 0;
+        // bowing with joined hands while praying (vái), otherwise just standing
+        if (stop.pray) pray(v.fig, 1, Math.max(0, Math.sin(t * 1.4 + v.phase)));
+        else rest(v.fig, t + v.phase);
+        v.fig.position.y = this.ground(v.fig.position.x, v.fig.position.z);
         if (v.wait <= 0) v.i = (v.i + 1) % v.route.length;
         continue;
       }
-      v.fig.rotation.x = 0;
       const dx = stop.x - v.fig.position.x, dz = stop.z - v.fig.position.z;
       const d = Math.hypot(dx, dz);
       // let the visitor pass
-      if (Math.hypot(player.x - v.fig.position.x, player.z - v.fig.position.z) < 1.3) continue;
+      if (Math.hypot(player.x - v.fig.position.x, player.z - v.fig.position.z) < 1.3) {
+        rest(v.fig, t + v.phase);
+        continue;
+      }
       if (d < 0.15) {
         v.wait = stop.pray ?? 0.4;
         continue;
@@ -203,7 +215,9 @@ export class Visitors {
       const step = Math.min(d, 1.05 * dt);
       v.fig.position.x += (dx / d) * step;
       v.fig.position.z += (dz / d) * step;
-      v.fig.position.y = this.ground(v.fig.position.x, v.fig.position.z) + Math.abs(Math.sin(t * 6 + v.phase)) * 0.03;
+      v.walk += step * 5.2;
+      walk(v.fig, v.walk);
+      v.fig.position.y = this.ground(v.fig.position.x, v.fig.position.z) + Math.abs(Math.cos(v.walk)) * 0.018;
       const want = Math.atan2(dx, dz);
       let diff = want - v.fig.rotation.y;
       diff = Math.atan2(Math.sin(diff), Math.cos(diff));
@@ -248,12 +262,14 @@ export class Arrival {
     mui.position.set(0.4, 0.2, 0);
     this.boat.add(mui);
     // the boatwoman at the stern with a conical hat
-    const woman = robedFigure({ robe: 0x5a4632, under: 0x2b2420, h: 1.55, hat: 'none' });
-    woman.position.set(-2.6, -0.2, 0);
+    const woman = person({ sex: 'f', outfit: 'aonau', robe: 0x4a3828, under: 0x8a5a3b, trousers: 0x1c1714, hair: 'bun', hat: 'non', h: 1.52 });
+    woman.position.set(-2.6, -0.06, 0);
     woman.rotation.y = Math.PI / 2;
-    const hat = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.2, 18), new THREE.MeshStandardMaterial({ color: 0xe8d9a8, roughness: 0.9 }));
-    hat.position.y = 1.58;
-    woman.add(hat);
+    // both hands on the oar
+    woman.userData.j.arms.forEach((a, i) => {
+      a.sh.rotation.set(-0.9, 0, (i ? -1 : 1) * 0.35);
+      a.el.rotation.set(-0.7, 0, 0);
+    });
     this.boat.add(woman);
     this.oar = new THREE.Group();
     const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 3, 6), dark);
@@ -338,7 +354,7 @@ export class Ceremony {
   private y0: number;
   /** the medium: a figure with arms we can move, a veil, and props */
   private medium = new THREE.Group();
-  private body: THREE.Group;
+  private body: Person;
   private robeMats: THREE.MeshStandardMaterial[] = [];
   private underMats: THREE.MeshStandardMaterial[] = [];
   private veil: THREE.Mesh;
@@ -376,57 +392,43 @@ export class Ceremony {
     tray.position.set(0, y + 0.06, -12.1);
     this.g.add(tray);
 
-    // the medium
-    this.body = new THREE.Group();
-    const robe = mat(0xc81e1e), under = mat(0xe8b830), skin = mat(0xf1d3b8);
-    this.robeMats.push(robe);
-    this.underMats.push(under);
-    const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.58, 1.2, 12), robe);
-    skirt.position.y = 0.6;
-    const hem = new THREE.Mesh(new THREE.CylinderGeometry(0.59, 0.6, 0.1, 12), under);
-    hem.position.y = 0.06;
-    const sash = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.25, 0.1, 12), under);
-    sash.position.y = 0.98;
-    const chest = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.24, 0.35, 12), robe);
-    chest.position.y = 1.18;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 14, 10), skin);
-    head.position.y = 1.5;
-    const khan = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.055, 8, 16), under);
-    khan.rotation.x = Math.PI / 2;
-    khan.position.y = 1.59;
-    this.body.add(skirt, hem, sash, chest, head, khan);
-    [-1, 1].forEach((sd) => {
-      const arm = new THREE.Group();
-      arm.position.set(sd * 0.24, 1.3, 0);
-      const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.16, 0.62, 8), robe);
-      sleeve.position.y = -0.3;
-      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), skin);
-      hand.position.y = -0.64;
-      arm.add(sleeve, hand);
-      arm.rotation.z = sd * 0.25;
-      this.arms.push(arm);
-      this.body.add(arm);
-    });
-    // khăn phủ diện: the red veil
-    this.veil = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.36, 0.62, 12, 1, true), mat(0xc81e1e, { side: THREE.DoubleSide, emissive: 0x3a0800 }));
-    this.veil.position.y = 1.42;
-    this.body.add(this.veil);
-    // props, held in the hands
+    // the medium: in ritual robes with wide sleeves, the red khăn phủ diện over the head
+    const med = person({ sex: 'f', outfit: 'robe', robe: 0xc81e1e, under: 0xe8b830, trousers: 0xf1ece0, hair: 'bun', wideSleeves: true, h: 1.6 });
+    this.body = med;
+    const mj = med.userData.j;
+    this.robeMats.push(mj.mats.robe);
+    this.underMats.push(mj.mats.under);
+    const khan = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.03, 8, 22), mj.mats.under);
+    khan.rotation.x = Math.PI / 2 - 0.15;
+    khan.position.set(0, 0.17, -0.008);
+    mj.head.add(khan);
+    this.arms = mj.arms.map((a) => a.sh);
+    mj.arms.forEach((a) => (a.el.rotation.x = -0.35));
+    // khăn phủ diện: the red veil, falling from the crown to the shoulders
+    const veilGeo = new THREE.CylinderGeometry(0.075, 0.2, 0.36, 18, 3, true);
+    veilGeo.translate(0, -0.06, 0);
+    this.veil = new THREE.Mesh(veilGeo, mat(0xc81e1e, { side: THREE.DoubleSide, emissive: 0x3a0800 }));
+    this.veil.position.y = 0.16;
+    const crownCap = new THREE.Mesh(new THREE.SphereGeometry(0.076, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), this.veil.material);
+    crownCap.position.y = 0.12;
+    this.veil.add(crownCap);
+    mj.head.add(this.veil);
+    // props, held in the hands (offsets measured from the palm)
     const fan = () => {
       const f = new THREE.Mesh(new THREE.CircleGeometry(0.32, 16, 0, Math.PI), mat(0xe8b830, { side: THREE.DoubleSide, emissive: 0x3a2a00 }));
-      f.position.y = -0.82;
+      f.position.y = -0.18;
       return f;
     };
     this.props.fans = new THREE.Group();
     this.props.sword = new THREE.Group();
     this.props.cup = new THREE.Group();
     this.props.baskets = new THREE.Group();
-    this.arms.forEach((a, i) => {
+    mj.arms.forEach(({ hand: a }, i) => {
       const f = fan();
       f.userData.prop = 'fans';
       a.add(f);
       const b = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.08, 0.12, 10), mat(0x9c7a46));
-      b.position.y = -0.74;
+      b.position.y = -0.1;
       b.userData.prop = 'baskets';
       const fl = new THREE.Mesh(new THREE.IcosahedronGeometry(0.09, 0), mat(0xf29bb8, { emissive: 0x4a1020 }));
       fl.position.y = 0.08;
@@ -434,11 +436,11 @@ export class Ceremony {
       a.add(b);
       if (i === 1) {
         const sw = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.9, 0.06), mat(0xd8dde2, { metalness: 0.8, roughness: 0.25 }));
-        sw.position.y = -1.05;
+        sw.position.y = -0.41;
         sw.userData.prop = 'sword';
         a.add(sw);
         const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.04, 0.08, 10), mat(0xd6a12b, { metalness: 0.5 }));
-        cup.position.y = -0.7;
+        cup.position.y = -0.06;
         cup.userData.prop = 'cup';
         a.add(cup);
       }
@@ -462,7 +464,11 @@ export class Ceremony {
     this.g.add(this.auraLight);
 
     // the cung văn band and attendants
-    this.lutist = robedFigure({ robe: 0x34507a, under: 0xf1ead8, h: 1.1 });
+    this.lutist = person({ sex: 'm', outfit: 'aothe', robe: 0x1f2a3e, hair: 'khanxep', pose: 'kneel', h: 1.62, trousers: 0x2a2620 });
+    (this.lutist as Person).userData.j.arms.forEach((a, i) => {
+      a.sh.rotation.set(-0.75, 0, (i ? -1 : 1) * 0.3);
+      a.el.rotation.set(-0.6, 0, 0);
+    });
     this.lutist.position.set(-2.3, y, -9.7);
     const lute = new THREE.Group();
     const bodyL = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.06, 16), mat(0xd6a12b));
@@ -471,10 +477,11 @@ export class Ceremony {
     neck.position.set(0.25, 0.32, 0);
     neck.rotation.z = -0.6;
     lute.add(bodyL, neck);
-    lute.position.set(0.1, 0.62, 0.25);
+    lute.position.set(0.04, 0.62, 0.3);
+    lute.rotation.x = -0.2;
     this.lutist.add(lute);
     this.g.add(this.lutist);
-    const clapper = robedFigure({ robe: 0x6b4a2e, under: 0xe8b830, h: 1.05 });
+    const clapper = person({ sex: 'm', elder: true, outfit: 'aothe', robe: 0x3a2a20, hair: 'khanxep', pose: 'kneel', h: 1.6, trousers: 0x2a2620 });
     clapper.position.set(-2.9, y, -11.2);
     this.g.add(clapper);
     this.drum = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.42, 16), mat(0xb8382b));
@@ -484,14 +491,19 @@ export class Ceremony {
     skinTop.position.y = 0.22;
     this.drum.add(skinTop);
     this.g.add(this.drum);
-    const drummer = robedFigure({ robe: 0x34507a, under: 0xf1ead8, h: 1.05 });
+    const drummer = person({ sex: 'm', outfit: 'aothe', robe: 0x1f2a3e, hair: 'khanxep', pose: 'kneel', h: 1.62, trousers: 0x2a2620 });
+    drummer.userData.j.arms.forEach((a, i) => {
+      a.sh.rotation.set(-0.7, 0, (i ? -1 : 1) * 0.2);
+      a.el.rotation.set(-0.5, 0, 0);
+    });
     drummer.position.set(3.1, y, -10.3);
     this.g.add(drummer);
     [
       [-1.4, -12.3],
       [1.4, -12.3],
     ].forEach(([x, z]) => {
-      const f = robedFigure({ robe: 0xf1ead8, under: 0xb8382b, h: 1.05 });
+      const f = person({ sex: 'f', outfit: 'aodai', robe: 0xf1ead8, hair: 'bun', pose: 'kneel', h: 1.55 });
+      pray(f, 1);
       f.position.set(x, y, z);
       this.g.add(f);
     });

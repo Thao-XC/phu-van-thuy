@@ -1,3 +1,4 @@
+import { person, rest } from '../kit/people';
 import * as THREE from 'three';
 import type { Layout, SpotDef } from './types';
 import { hills } from './types';
@@ -137,15 +138,9 @@ export const phuVanThuy: Layout = (ctx) => {
   ctx.add(stall, 10, 32, -0.4);
 
   // keeper of the temple (Bà Thủ Từ)
-  const keeper = new THREE.Group();
+  const keeper = person({ sex: 'f', elder: true, outfit: 'aonau', robe: 0x5b3a2a, under: 0x8a5a3b, trousers: 0x1c1714, hair: 'khanvan', h: 1.5, skin: 0xd9ab84 });
   keeper.name = 'keeper';
-  const robe = new THREE.MeshStandardMaterial({ color: 0x6d2a6a, roughness: 0.6 });
-  keeper.add(at(new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.48, 1.35, 10), robe), 0, 0.68, 0));
-  keeper.add(at(new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), new THREE.MeshStandardMaterial({ color: 0xe0b994 })), 0, 1.5, 0));
-  const khan = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.06, 6, 14), new THREE.MeshStandardMaterial({ color: 0x2a1a12 }));
-  khan.rotation.x = Math.PI / 2;
-  khan.position.y = 1.6;
-  keeper.add(khan);
+  rest(keeper, 0, true);
   ctx.add(keeper, 4.5, 16.5, -2.4);
 
   // five-colour festival flags (cờ ngũ sắc) along the path

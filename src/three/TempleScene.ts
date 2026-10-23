@@ -931,46 +931,42 @@ export class TempleScene {
     const running = !!(this.keysPressed['ShiftLeft'] || this.keysPressed['ShiftRight']);
     const frozen = !!this.fade || !!this.rite || (this.enc !== null && (this.enc.ending || !this.enc.rt));
     const swim = this.enc?.rt?.underwater ? 0.65 : 1;
-    const moveSpeed = frozen ? 0 : (running ? 9.0 : 4.5) * swim * delta;
+    // a calm temple walk (about 2 m/s), Shift for a brisk one; easing in and out, never jumpy
+    const topSpeed = frozen ? 0 : (running ? 3.6 : 2.0) * swim;
 
     this._forward.set(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.playerRotationY);
     this._right.set(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.playerRotationY);
 
-    let moved = false;
-
-    // Keyboard controls (WASD & Arrows)
-    if (this.keysPressed['KeyW'] || this.keysPressed['ArrowUp']) {
-      this.playerPosition.addScaledVector(this._forward, moveSpeed);
-      moved = true;
-    }
-    if (this.keysPressed['KeyS'] || this.keysPressed['ArrowDown']) {
-      this.playerPosition.addScaledVector(this._forward, -moveSpeed);
-      moved = true;
+    // Keyboard (WASD & arrows) and the touch joystick, combined so diagonals are no faster
+    let fwd = 0, side = 0;
+    if (this.keysPressed['KeyW'] || this.keysPressed['ArrowUp']) fwd += 1;
+    if (this.keysPressed['KeyS'] || this.keysPressed['ArrowDown']) fwd -= 1;
+    if (this.keysPressed['KeyA']) side -= 1;
+    if (this.keysPressed['KeyD']) side += 1;
+    fwd -= this.joystickVector.y;
+    side += this.joystickVector.x;
+    const mag = Math.hypot(fwd, side);
+    if (mag > 1) {
+      fwd /= mag;
+      side /= mag;
     }
     // ← → turn on the spot (keyboard-only visitors), A D step sideways
-    const turnRate = (running ? 2.6 : 1.9) * delta * (frozen ? 0 : 1);
+    const turnRate = (running ? 2.0 : 1.5) * delta * (frozen ? 0 : 1);
     if (this.keysPressed['ArrowLeft']) this.playerRotationY += turnRate;
     if (this.keysPressed['ArrowRight']) this.playerRotationY -= turnRate;
     if (this.keysPressed['PageUp']) this.playerPitch = Math.min(Math.PI / 2.4, this.playerPitch + delta);
     if (this.keysPressed['PageDown']) this.playerPitch = Math.max(-Math.PI / 2.4, this.playerPitch - delta);
-    if (this.keysPressed['KeyA']) {
-      this.playerPosition.addScaledVector(this._right, -moveSpeed);
-      moved = true;
-    }
-    if (this.keysPressed['KeyD']) {
-      this.playerPosition.addScaledVector(this._right, moveSpeed);
-      moved = true;
-    }
 
-    // Touch joystick
-    if (this.joystickVector.x !== 0 || this.joystickVector.y !== 0) {
-      this.playerPosition.addScaledVector(this._forward, -this.joystickVector.y * moveSpeed);
-      this.playerPosition.addScaledVector(this._right, this.joystickVector.x * moveSpeed);
-      moved = true;
-    }
+    const want = this._want.set(0, 0, 0).addScaledVector(this._forward, fwd * topSpeed).addScaledVector(this._right, side * topSpeed);
+    const ease = 1 - Math.exp(-delta * (want.lengthSq() > 0 ? 7 : 10));
+    this._vel.lerp(want, ease);
+    if (frozen) this._vel.set(0, 0, 0);
+    if (this._vel.lengthSq() < 1e-4) this._vel.set(0, 0, 0);
+    this.playerPosition.addScaledVector(this._vel, delta);
+    const moved = this._vel.lengthSq() > 0.04;
 
     // Play footstep sound periodically
-    if (moved && Math.random() < 0.08 && !this.enc?.rt?.underwater) {
+    if (moved && Math.random() < 0.05 * (this._vel.length() / 2) && !this.enc?.rt?.underwater) {
       soundService.playFootstep();
     }
     this.manners.runT = moved && running ? this.manners.runT + delta : 0;
@@ -1021,6 +1017,11 @@ export class TempleScene {
         this.playerPosition.z = prevZ;
       }
     }
+    // walls and water take the momentum out of whichever way you were pushing
+    if (delta > 0) {
+      if (this.playerPosition.x === prevX) this._vel.x = 0;
+      if (this.playerPosition.z === prevZ) this._vel.z = 0;
+    }
     // follow the ground (stairs, slopes, bridges) with a little smoothing
     const targetY = 1.7 + this.ground(this.playerPosition.x, this.playerPosition.z);
     this.playerPosition.y += (targetY - this.playerPosition.y) * Math.min(1, delta * 12);
@@ -1028,8 +1029,8 @@ export class TempleScene {
     // Smooth camera update
     this.camera.position.copy(this.playerPosition);
     // a gentle head bob while walking
-    this.bobT = moved ? this.bobT + delta * (running ? 13 : 9) : this.bobT * 0.9;
-    if (moved) this.camera.position.y += Math.sin(this.bobT) * 0.035;
+    this.bobT = moved ? this.bobT + delta * (running ? 10 : 7.5) : this.bobT * 0.9;
+    if (moved) this.camera.position.y += Math.sin(this.bobT) * 0.022 * Math.min(1, this._vel.length() / 2);
     if (this.enc?.rt?.underwater) this.camera.position.y += Math.sin(this.elapsed * 1.6) * 0.18;
     if (this.shakeT > 0) {
       this.shakeT -= delta;
@@ -1649,6 +1650,8 @@ export class TempleScene {
   private gazePeak = 0;
   private scapeT = 0;
   private _fwd = new THREE.Vector3();
+  private _vel = new THREE.Vector3();
+  private _want = new THREE.Vector3();
   private _to = new THREE.Vector3();
   /** night: look up into a Mother's face long enough and the world begins to ripple */
   private updateGaze(dt: number) {

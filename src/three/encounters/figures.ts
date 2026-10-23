@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { person } from '../kit/people';
 
 /**
  * Low-poly characters and creatures for the secret worlds.
@@ -22,7 +23,7 @@ export type Animated = THREE.Group & { userData: { animate?: (t: number) => void
 /* People & spirits                                                  */
 /* ---------------------------------------------------------------- */
 
-/** A standing robed figure (kimono / court robes). Used for Otohime, Uneme, Michizane, Uzume… */
+/** A standing robed figure in Vietnamese ritual dress (spirits, Mothers, mediums, the realm folk) */
 export function robedFigure(o: {
   robe: number;
   under?: number;
@@ -34,52 +35,20 @@ export function robedFigure(o: {
   ghost?: boolean;
   sleeves?: number;
 }): Animated {
-  const g = new THREE.Group() as Animated;
-  const h = o.h ?? 1.7;
-  const k = h / 1.7;
-  const ghost = o.ghost ? { transparent: true, opacity: 0.55, emissive: new THREE.Color(0x6f8a96), emissiveIntensity: 0.6 } : {};
-  const robe = std(o.robe, ghost);
-  const under = std(o.under ?? o.robe, ghost);
-  const skin = std(o.skin ?? 0xf1d3b8, ghost);
-  const hair = std(o.hair ?? 0x111111, ghost);
-  // layered robe (jūnihitoe feel)
-  g.add(mesh(new THREE.CylinderGeometry(0.22 * k, 0.55 * k, 1.25 * k, 10), robe, 0, 0.62 * k, 0));
-  g.add(mesh(new THREE.CylinderGeometry(0.2 * k, 0.5 * k, 1.1 * k, 10), under, 0, 0.58 * k, 0.04 * k));
-  // sleeves
-  [-1, 1].forEach((s) => {
-    const sl = mesh(new THREE.BoxGeometry(0.28 * k, (o.sleeves ?? 0.55) * k, 0.3 * k), robe, s * 0.3 * k, 1.05 * k, 0.05 * k);
-    sl.rotation.z = s * 0.25;
-    g.add(sl);
-  });
-  g.add(mesh(new THREE.CylinderGeometry(0.07 * k, 0.07 * k, 0.12 * k, 8), skin, 0, 1.3 * k, 0));
-  const head = mesh(new THREE.SphereGeometry(0.15 * k, 12, 10), skin, 0, 1.46 * k, 0);
-  g.add(head);
-  // hair
-  if (o.longHair) {
-    g.add(mesh(new THREE.SphereGeometry(0.165 * k, 12, 10), hair, 0, 1.49 * k, -0.02 * k));
-    const back = mesh(new THREE.BoxGeometry(0.3 * k, 1.1 * k, 0.08 * k), hair, 0, 1.0 * k, -0.13 * k);
-    g.add(back);
-    if (o.ghost) {
-      // hair hanging over the face (classic yūrei)
-      const veil = mesh(new THREE.BoxGeometry(0.26 * k, 0.55 * k, 0.05 * k), hair, 0, 1.32 * k, 0.15 * k);
-      g.add(veil);
-    }
-  } else {
-    g.add(mesh(new THREE.SphereGeometry(0.155 * k, 12, 10, 0, Math.PI * 2, 0, Math.PI / 2), hair, 0, 1.48 * k, 0));
-  }
-  if (o.hat === 'eboshi') {
-    const hat = mesh(new THREE.CylinderGeometry(0.08 * k, 0.12 * k, 0.32 * k, 8), std(0x0b0b0b, ghost), 0, 1.72 * k, -0.02 * k);
-    hat.rotation.x = -0.25;
-    g.add(hat);
-  } else if (o.hat === 'crown') {
-    g.add(mesh(new THREE.CylinderGeometry(0.16 * k, 0.16 * k, 0.06 * k, 12), std(0xe2b23a, { metalness: 0.6, roughness: 0.3 }), 0, 1.6 * k, 0));
-    for (let i = 0; i < 5; i++) {
-      const a = (i / 5) * Math.PI * 2;
-      g.add(mesh(new THREE.ConeGeometry(0.025 * k, 0.12 * k, 5), std(0xe2b23a, { metalness: 0.6 }), Math.cos(a) * 0.15 * k, 1.68 * k, Math.sin(a) * 0.15 * k));
-    }
-  }
-  g.userData.head = head;
-  return g;
+  const male = o.hat === 'eboshi';
+  return person({
+    sex: male ? 'm' : 'f',
+    outfit: 'robe',
+    robe: o.robe,
+    under: o.under,
+    skin: o.skin,
+    hairColor: o.hair,
+    h: o.h ?? 1.7,
+    hair: male ? 'khanxep' : o.longHair ? 'long' : 'bun',
+    hat: o.hat === 'crown' ? 'crown' : 'none',
+    ghost: o.ghost,
+    wideSleeves: true,
+  }) as unknown as Animated;
 }
 
 /** Mermaid (ningyo): human upper body, long hair, shimmering fish tail */
