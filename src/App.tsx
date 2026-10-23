@@ -7,7 +7,7 @@ import type { StoryCard } from './three/encounters/types';
 import { Landing } from './components/Landing';
 import type { RitualKey } from './components/Dock';
 import { PlacesPicker } from './components/Places';
-import { KeeperSheet } from './components/Keeper';
+import { KeeperTalk } from './components/Keeper';
 import { JournalSheet } from './components/Journal';
 import { Tracker } from './components/Trail';
 import { lazy, Suspense } from 'react';
@@ -79,6 +79,11 @@ export default function App() {
   const possessBus = useMemo(() => createPossessBus(), []);
   const [possessing, setPossessing] = useState(false);
   const [touchWarn, setTouchWarn] = useState(0);
+  // talking to Bà Thủ Từ: face her, and keep her bubble over her head
+  const keeperAnchor = useCallback(() => scene.current?.project('keeper', 1.72) ?? null, []);
+  useEffect(() => {
+    scene.current?.talkTo(modal === 'keeper' ? 'keeper' : null, 1.42);
+  }, [modal]);
   // first-person rites
   const [rite, setRite] = useState<string | null>(null);
   const [riteHint, setRiteHint] = useState<string | null>(null);
@@ -817,7 +822,8 @@ export default function App() {
         setShowPhuc(false);
       }}>
       {modal === 'keeper' && (
-        <KeeperSheet
+        <KeeperTalk
+          anchor={keeperAnchor}
           onClose={() => setModal(null)}
           onStart={() => {
             storyService.start();

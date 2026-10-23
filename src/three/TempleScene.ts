@@ -1444,8 +1444,62 @@ export class TempleScene {
     this.scene.add(g);
     this.planted.push({ g, t: 0 });
   }
+  /* ---------------- conversations: speech bubbles over heads ---------------- */
+  private talkTarget: THREE.Vector3 | null = null;
+  private _proj = new THREE.Vector3();
+  /** turn gently to face someone while talking (null to stop) */
+  private talkObj: { o: THREE.Object3D; base: number } | null = null;
+  private turning = new Set<THREE.Object3D>();
+  public talkTo(name: string | null, headY = 1.45) {
+    const o = name ? this.scene.getObjectByName(name) : null;
+    // whoever you were talking to goes back to what they were doing
+    if (this.talkObj && this.talkObj.o !== o) {
+      this.talkObj.o.userData.turnTo = this.talkObj.base;
+      this.turning.add(this.talkObj.o);
+      this.talkObj = null;
+    }
+    if (!o) {
+      this.talkTarget = null;
+      return;
+    }
+    if (!this.talkObj) this.talkObj = { o, base: o.rotation.y };
+    o.userData.turnTo = o.rotation.y;
+    this.turning.add(o);
+    o.updateMatrixWorld(true);
+    this.talkTarget = new THREE.Vector3().setFromMatrixPosition(o.matrixWorld).add(new THREE.Vector3(0, headY, 0));
+  }
+  /** where a named figure's head (plus some height) is on screen, in CSS pixels */
+  public project(name: string, y = 1.8): { x: number; y: number; on: boolean } | null {
+    const o = this.scene.getObjectByName(name);
+    if (!o) return null;
+    o.updateMatrixWorld(true);
+    this._proj.setFromMatrixPosition(o.matrixWorld);
+    this._proj.y += y;
+    const behind = this._proj.clone().sub(this.camera.position).dot(this.camera.getWorldDirection(new THREE.Vector3())) < 0;
+    this._proj.project(this.camera);
+    const r = this.renderer.domElement.getBoundingClientRect();
+    return { x: r.left + ((this._proj.x + 1) / 2) * r.width, y: r.top + ((1 - this._proj.y) / 2) * r.height, on: !behind && Math.abs(this._proj.x) < 1.05 && Math.abs(this._proj.y) < 1.05 };
+  }
+
   private updateRite(dt: number) {
     this.hands?.update(dt);
+    // a speaker turns to face you while you talk, and back afterwards
+    this.turning.forEach((o) => {
+      let want = o.userData.turnTo as number;
+      if (this.talkObj?.o === o) want = Math.atan2(this.camera.position.x - o.position.x, this.camera.position.z - o.position.z);
+      let d = want - o.rotation.y;
+      d = Math.atan2(Math.sin(d), Math.cos(d));
+      o.rotation.y += d * Math.min(1, dt * 3);
+      if (this.talkObj?.o !== o && Math.abs(d) < 0.01) this.turning.delete(o);
+    });
+    if (this.talkTarget && !this.rite) {
+      const d = this.talkTarget.clone().sub(this.camera.position);
+      let dy = Math.atan2(-d.x, -d.z) - this.playerRotationY;
+      dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      const k = Math.min(1, dt * 2.5);
+      this.playerRotationY += dy * k;
+      this.playerPitch += (Math.atan2(d.y, Math.hypot(d.x, d.z)) - 0.03 - this.playerPitch) * k;
+    }
     if (this.faceTarget && this.rite) {
       const d = this.faceTarget.clone().sub(this.camera.position);
       const yaw = Math.atan2(-d.x, -d.z);
