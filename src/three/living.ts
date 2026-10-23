@@ -190,8 +190,20 @@ export class Visitors {
   update(dt: number, t: number, player: THREE.Vector3, visible: boolean) {
     for (const v of this.list) {
       // far-off visitors aren't drawn at all (each one is a few dozen pieces)
-      v.fig.visible = visible && !v.fig.userData.hidden && Math.hypot(player.x - v.fig.position.x, player.z - v.fig.position.z) < 42;
+      const pd = Math.hypot(player.x - v.fig.position.x, player.z - v.fig.position.z);
+      v.fig.visible = visible && !v.fig.userData.hidden && pd < 42;
       if (!v.fig.visible) continue;
+      // a glance as you pass: the head turns toward you, then back to the way they're going
+      {
+        const head = v.fig.userData.j.head;
+        let want = 0;
+        if (pd < 3.5) {
+          let a = Math.atan2(player.x - v.fig.position.x, player.z - v.fig.position.z) - v.fig.rotation.y;
+          a = Math.atan2(Math.sin(a), Math.cos(a));
+          if (Math.abs(a) < 1.9) want = Math.max(-1, Math.min(1, a));
+        }
+        head.rotation.y += (want - head.rotation.y) * Math.min(1, dt * 3);
+      }
       const stop = v.route[v.i];
       if (v.wait > 0) {
         v.wait -= dt;

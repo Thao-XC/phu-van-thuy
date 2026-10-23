@@ -117,6 +117,7 @@ export const phuVanThuy: Layout = (ctx) => {
 
   /* ---------------- courtyard ---------------- */
   const burner = vk.incenseBurner();
+  burner.scale.setScalar(0.72); // about chest-high bowl, as at real temples
   ctx.add(burner, 0, 14);
   const furnace = vk.furnace();
   ctx.add(furnace, 14, 10, -0.6);
@@ -344,7 +345,7 @@ export const phuVanThuy: Layout = (ctx) => {
     walkable: (x, z) => {
       if (walls(x, z)) return false;
       if (Math.hypot(x - BANYAN.x, z - BANYAN.z) < 2.3) return false;
-      if (Math.hypot(x, z - 14) < 1.5) return false; // incense burner
+      if (Math.hypot(x, z - 14) < 1.25) return false; // incense burner
       if (Math.abs(x - 14) < 1.6 && Math.abs(z - 10) < 1.6) return false; // furnace
       if (Math.abs(x - BELL.x) < 3.2 && Math.abs(z - BELL.z) < 3.2 && Math.hypot(x - BELL.x, z - BELL.z) > 1.0 && !(Math.abs(z - BELL.z) < 2.2 && x < BELL.x)) return false;
       if (x < -31.5 + 6 && Math.abs(z - GROTTO.z) < 6 && x < GROTTO.x - 0.5) return false; // rock behind grotto

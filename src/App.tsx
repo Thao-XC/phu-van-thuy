@@ -85,7 +85,7 @@ export default function App() {
   // talking to Bà Thủ Từ: face her, and keep her bubble over her head
   const puppetBus = useMemo(() => createPuppetBus(), []);
   const teuAnchor = useCallback(() => scene.current?.project('teu', 1.15) ?? null, []);
-  const keeperAnchor = useCallback(() => scene.current?.project('keeper', 1.72) ?? null, []);
+  const keeperAnchor = useCallback(() => scene.current?.project('keeper', 1.62) ?? null, []);
   useEffect(() => {
     scene.current?.talkTo(modal === 'keeper' ? 'keeper' : null, 1.42);
   }, [modal]);

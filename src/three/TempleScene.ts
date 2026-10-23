@@ -1447,7 +1447,7 @@ export class TempleScene {
     const host = this.riteHost();
     if (kind === 'bow') this.rite = new BowRite(host, ev, 1);
     else if (kind === 'pray') this.rite = new BowRite(host, ev, 3, 'Hands together before the Mothers. Three slow bows…');
-    else if (kind === 'incense') this.rite = new IncenseRite(host, ev, new THREE.Vector3(0, this.ground(0, 14) + 1.2, 14));
+    else if (kind === 'incense') this.rite = new IncenseRite(host, ev, new THREE.Vector3(0, this.ground(0, 14) + 1.5, 14));
     else if (kind === 'xam' && draw) this.rite = new XamRite(host, ev, new THREE.Vector3(8.8, this.ground(8.8, -9) + 0.9, -9), draw);
   }
   public cancelRite() {
@@ -1460,7 +1460,7 @@ export class TempleScene {
   }
   private plantIncense(n: number) {
     const g = new THREE.Group();
-    const base = new THREE.Vector3(0, this.ground(0, 14) + 1.05, 14);
+    const base = new THREE.Vector3(0, this.ground(0, 14) + 1.58, 14); // the ash in the bowl
     const stem = new THREE.MeshStandardMaterial({ color: 0xa8402e });
     const tip = new THREE.MeshBasicMaterial({ color: 0xff7a2a });
     for (let i = 0; i < n; i++) {
@@ -1481,6 +1481,7 @@ export class TempleScene {
   private _proj = new THREE.Vector3();
   /** turn gently to face someone while talking (null to stop) */
   private talkObj: { o: THREE.Object3D; base: number } | null = null;
+  private talkStep: THREE.Vector3 | null = null;
   private turning = new Set<THREE.Object3D>();
   public talkTo(name: string | null, headY = 1.45) {
     const o = name ? this.scene.getObjectByName(name) : null;
@@ -1495,6 +1496,13 @@ export class TempleScene {
       return;
     }
     if (!this.talkObj) this.talkObj = { o, base: o.rotation.y };
+    // step in to a comfortable talking distance, about an arm and a half away
+    const op = new THREE.Vector3().setFromMatrixPosition(o.matrixWorld);
+    const away = new THREE.Vector3(this.playerPosition.x - op.x, 0, this.playerPosition.z - op.z);
+    if (away.length() > 1.6) {
+      away.setLength(1.35).add(op);
+      if (!this.walkable || this.walkable(away.x, away.z)) this.talkStep = away;
+    }
     o.userData.turnTo = o.rotation.y;
     this.turning.add(o);
     o.updateMatrixWorld(true);
@@ -1524,8 +1532,26 @@ export class TempleScene {
       let d = want - o.rotation.y;
       d = Math.atan2(Math.sin(d), Math.cos(d));
       o.rotation.y += d * Math.min(1, dt * 3);
+      // and they look you in the eye: the head tilts up or down to meet yours
+      const j = (o.userData as { j?: { head: THREE.Object3D } }).j;
+      if (j) {
+        let want = 0;
+        if (this.talkObj?.o === o) {
+          j.head.updateMatrixWorld(true);
+          const hp = new THREE.Vector3().setFromMatrixPosition(j.head.matrixWorld);
+          const dist = Math.hypot(this.camera.position.x - hp.x, this.camera.position.z - hp.z);
+          want = -Math.max(-0.35, Math.min(0.5, Math.atan2(this.camera.position.y - hp.y - 0.1, dist)));
+        }
+        j.head.rotation.x += (want - j.head.rotation.x) * Math.min(1, dt * 4);
+      }
       if (this.talkObj?.o !== o && Math.abs(d) < 0.01) this.turning.delete(o);
     });
+    if (this.talkStep) {
+      const k = Math.min(1, dt * 2.5);
+      this.playerPosition.x += (this.talkStep.x - this.playerPosition.x) * k;
+      this.playerPosition.z += (this.talkStep.z - this.playerPosition.z) * k;
+      if (Math.hypot(this.talkStep.x - this.playerPosition.x, this.talkStep.z - this.playerPosition.z) < 0.03 || !this.talkTarget) this.talkStep = null;
+    }
     if (this.talkTarget && !this.rite) {
       const d = this.talkTarget.clone().sub(this.camera.position);
       let dy = Math.atan2(-d.x, -d.z) - this.playerRotationY;

@@ -16,17 +16,20 @@ export interface Settings {
   minimap: boolean;
 }
 const KEY = 'pvt_settings';
-export const DEFAULT_SETTINGS: Settings = { sensitivity: 1, invertY: false, pointerLock: true, quality: 'high', fov: 62, minimap: true };
+export const DEFAULT_SETTINGS: Settings = { sensitivity: 1, invertY: false, pointerLock: true, quality: 'high', fov: 54, minimap: true };
 export function loadSettings(): Settings {
   try {
-    return { ...DEFAULT_SETTINGS, ...(JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Settings>) };
+    const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Settings> & { v?: number };
+    // the old default (62°) made the world loom like a child's view: move people still on it to the new one
+    if (!saved.v && saved.fov === 62) saved.fov = DEFAULT_SETTINGS.fov;
+    return { ...DEFAULT_SETTINGS, ...saved };
   } catch {
     return DEFAULT_SETTINGS;
   }
 }
 export function saveSettings(s: Settings) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(s));
+    localStorage.setItem(KEY, JSON.stringify({ ...s, v: 2 }));
   } catch {
     /* ignore */
   }

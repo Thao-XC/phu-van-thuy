@@ -235,6 +235,9 @@ export class Hands {
     return this.cur[0].p.clone().add(this.cur[1].p).multiplyScalar(0.5).add(this.offset);
   }
   update(dt: number) {
+    // poses were framed at a 62° view; lift the hands as the view narrows so they stay in sight
+    const cam = this.rig.parent as THREE.PerspectiveCamera | null;
+    if (cam?.isPerspectiveCamera) this.rig.position.y = (Math.tan((31 * Math.PI) / 180) - Math.tan(((cam.fov / 2) * Math.PI) / 180)) * 0.42;
     const k = 1 - Math.exp(-dt * this.speed);
     const tq = new THREE.Quaternion();
     let vis = false;
