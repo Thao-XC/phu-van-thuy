@@ -620,6 +620,7 @@ export class TempleScene {
     if (e.code.startsWith('Arrow')) e.preventDefault();
     this.keysPressed[e.code] = true;
     if (e.code === 'KeyB' && !e.repeat) this.bow();
+    if (e.code === 'KeyR' && !e.repeat && this.aboutFace <= 0) this.aboutFace = Math.PI;
   };
 
   private onKeyUp = (e: KeyboardEvent) => {
@@ -951,9 +952,15 @@ export class TempleScene {
       side /= mag;
     }
     // ← → turn on the spot (keyboard-only visitors), A D step sideways
-    const turnRate = (running ? 2.0 : 1.5) * delta * (frozen ? 0 : 1);
+    const turnRate = (running ? 3.0 : 2.3) * delta * (frozen ? 0 : 1);
     if (this.keysPressed['ArrowLeft']) this.playerRotationY += turnRate;
     if (this.keysPressed['ArrowRight']) this.playerRotationY -= turnRate;
+    // R: turn right around, in one smooth half-circle
+    if (this.aboutFace > 0 && !frozen) {
+      const step = Math.min(this.aboutFace, delta * 4.2);
+      this.playerRotationY += step;
+      this.aboutFace -= step;
+    }
     if (this.keysPressed['PageUp']) this.playerPitch = Math.min(Math.PI / 2.4, this.playerPitch + delta);
     if (this.keysPressed['PageDown']) this.playerPitch = Math.max(-Math.PI / 2.4, this.playerPitch - delta);
 
@@ -1705,6 +1712,7 @@ export class TempleScene {
   private scapeT = 0;
   private _fwd = new THREE.Vector3();
   private _vel = new THREE.Vector3();
+  private aboutFace = 0;
   private _want = new THREE.Vector3();
   private _to = new THREE.Vector3();
   /** night: look up into a Mother's face long enough and the world begins to ripple */

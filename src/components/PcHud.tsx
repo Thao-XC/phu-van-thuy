@@ -88,6 +88,7 @@ const KEYS: [string, string][] = [
   ['↑ / ↓', 'Walk forward and back'],
   ['← / →', 'Turn left and right'],
   ['W A S D', 'Walk and step sideways'],
+  ['R', 'Turn right around'],
   ['Shift', 'Hurry (not inside the temple!)'],
   ['Mouse', 'Click the view to look around; drag also works'],
   ['Click', 'A golden marker takes you to that place'],

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, BookOpen, Volume2, VolumeX, Settings as Gear, Keyboard } from 'lucide-react';
+import { ArrowLeft, BookOpen, Volume2, VolumeX, Settings as Gear } from 'lucide-react';
 import { Minimap, SettingsSheet, ControlsSheet, LanternSheet, loadSettings, saveSettings, type Settings } from './components/PcHud';
 import { TempleScene, type TimeOfDay } from './three/TempleScene';
 import type { SpotDef } from './three/world/types';
@@ -13,7 +13,7 @@ import { Tracker } from './components/Trail';
 import { lazy, Suspense } from 'react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 const LegendFilm = lazy(() => import('./components/LegendFilm').then((m) => ({ default: m.LegendFilm })));
-import { useCalendar, CalendarChip, FestivalSheet, festivalKey, isFestivalDone, markFestivalDone } from './components/Calendar';
+import { useCalendar, TempleClock, FestivalSheet, festivalKey, isFestivalDone, markFestivalDone } from './components/Calendar';
 import { liveTimeOfDay, today, type Festival } from './services/lunar';
 import { SECRETS, nextSecret } from './data/story';
 import { AltarModal, PetitionModal, StallModal, XamSlip, drawXam } from './components/Rituals';
@@ -79,6 +79,8 @@ export default function App() {
   const possessBus = useMemo(() => createPossessBus(), []);
   const [possessing, setPossessing] = useState(false);
   const [touchWarn, setTouchWarn] = useState(0);
+  // the key list shows for 20 seconds after arriving, then steps out of the way
+  const [keysHint, setKeysHint] = useState(true);
   // talking to Bà Thủ Từ: face her, and keep her bubble over her head
   const keeperAnchor = useCallback(() => scene.current?.project('keeper', 1.72) ?? null, []);
   useEffect(() => {
@@ -407,6 +409,12 @@ export default function App() {
     if (k === 'keeper' || k === 'furnace' || k === 'stall' || k === 'lantern') setModal(k as Modal);
   };
 
+  useEffect(() => {
+    if (view !== 'temple' || loading || arriving) return;
+    setKeysHint(true);
+    const t = window.setTimeout(() => setKeysHint(false), 20000);
+    return () => clearTimeout(t);
+  }, [view, loading, arriving]);
   // keyboard: E to interact. No dependency list on purpose: the handler reads a lot of current
   // state (near, modal, rite…), so it is re-attached after every render rather than going stale.
   useEffect(() => {
@@ -627,23 +635,19 @@ export default function App() {
       <div className={`fixed top-[max(0.75rem,env(safe-area-inset-top))] left-3 z-30 flex items-center gap-2 ${modal === 'haudong' || possessing ? 'hidden' : ''}`}>
         <button
           onClick={() => (inRealm ? scene.current?.leaveLegend() : setView('landing'))}
-          className="flex items-center gap-1.5 pl-2.5 pr-3.5 py-2 rounded-xl dh-paper border border-[#211a15] text-[#2a1d14] text-xs font-semibold shadow-md cursor-pointer hover:border-[#8e1b1b]"
+          className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl dh-paper border border-[#211a15] text-[#2a1d14] text-xs font-semibold shadow-md cursor-pointer hover:border-[#8e1b1b]"
           aria-label={inRealm ? 'Back to the temple' : 'Leave the temple'}
           title={inRealm ? 'Back to the temple (Esc)' : 'Leave (Esc)'}
         >
           <ArrowLeft className="w-4 h-4 text-[#8e1b1b]" />
-          <span>{inRealm ? 'Temple' : 'Leave'}</span>
-          <kbd className="hidden pointer-fine:inline ml-1 px-1 rounded border border-[#211a15] text-[10px] text-[#6d5b49] font-sans">Esc</kbd>
+          <kbd className="px-1 rounded border border-[#211a15] text-[10px] text-[#6d5b49] font-sans">Esc</kbd>
         </button>
-        <div className="hidden min-[520px]:flex items-center gap-2 px-3 py-2 rounded-xl dh-paper border border-[#211a15] shadow-md text-xs">
-          <span className="text-[#4a3826] font-semibold">Phủ Vân Thủy</span>
-        </div>
 
       </div>
 
       {/* top-right: phúc, scarves, journal, sound */}
       <div className={`fixed top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-30 flex items-center gap-1.5 sm:gap-2 ${modal === 'haudong' || possessing ? 'hidden' : ''}`}>
-        <CalendarChip now={cal.now} lunar={cal.lunar} festival={cal.festival} onClick={() => setModal('calendar')} />
+        <TempleClock lunar={cal.lunar} festival={cal.festival} tod={time} live={live} onClick={() => setModal('calendar')} />
         <LuckChip onClick={() => setShowPhuc(true)} compact />
         <button onClick={() => openJournal()} className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-xl dh-paper border border-[#211a15] shadow-md cursor-pointer hover:border-[#8e1b1b]" aria-label={`Journal: ${story.khan.length} of 4 scarves`}>
           <span className="flex -space-x-2.5">
@@ -653,9 +657,6 @@ export default function App() {
           </span>
           <span className="text-xs font-bold tabular-nums text-[#4a3826]">{story.khan.length}/4</span>
           <BookOpen className="w-4 h-4 text-[#8e1b1b] hidden sm:block" />
-        </button>
-        <button onClick={() => setModal('controls')} className="hidden pointer-fine:flex p-2 rounded-xl dh-paper border border-[#211a15] shadow-md cursor-pointer" aria-label="Controls" title="Controls (?)">
-          <Keyboard className="w-4 h-4 text-[#4a3826]" />
         </button>
         <button onClick={() => setModal('settings')} className="p-2 rounded-xl dh-paper border border-[#211a15] shadow-md cursor-pointer" aria-label="Settings" title="Settings">
           <Gear className="w-4 h-4 text-[#4a3826]" />
@@ -705,16 +706,15 @@ export default function App() {
           className="fixed top-16 left-1/2 -translate-x-1/2 z-20 px-3 py-1.5 rounded-full dh-seal text-[12px] font-semibold cursor-pointer flex items-center gap-2"
           title="Find the mat at the back of the courtyard"
         >
-          <span className="w-2 h-2 rounded-full bg-[#ffd27a] animate-pulse" /> Hầu đồng now in the main hall · until {fmtHour(hd.on.to)}
+          <span className="w-2 h-2 rounded-full bg-[#ffd27a] animate-pulse" /> Hầu đồng · until {fmtHour(hd.on.to)}
         </button>
       )}
 
       {/* today's festival */}
       {festBanner && cal.festival && !modal && !inRealm && (
         <button onClick={() => setModal('calendar')} className="fixed top-16 left-1/2 -translate-x-1/2 z-30 px-5 py-3 rounded-md dh-seal text-center cursor-pointer fest-in max-w-[92vw]">
-          <div className="text-[11px] uppercase tracking-[0.2em] opacity-90">Hôm nay · today</div>
           <div className="dh-title text-lg leading-tight">{cal.festival.vi}</div>
-          <div className="text-[12px] italic opacity-90">{cal.festival.en} · see what's happening</div>
+          <div className="text-[12px] italic opacity-90">{cal.festival.en}</div>
         </button>
       )}
 
@@ -790,10 +790,21 @@ export default function App() {
           Click: go to {spots.find((x) => x.id === aim)?.vi}
         </div>
       )}
-      {!inRealm && !modal && !rite && !possessing && (
-        <div className="hidden lg:flex fixed left-3 bottom-4 z-20 flex-col gap-1 px-3 py-2 rounded-xl bg-[#2a1410]/70 text-[#fbeed2] text-[12px] backdrop-blur-sm pointer-events-none">
-          <span>{locked ? 'Mouse captured · Esc to release' : 'Click the view to look around'}</span>
-          <span className="opacity-80">↑↓←→ move · Space use · B vái · P pray · F xăm · Tab places · ? keys</span>
+      {/* the keys, shown for a moment when you arrive, then just a whisper of "?" */}
+      {!inRealm && !modal && !rite && !possessing && !arriving && !loading && (
+        <div className={`fixed left-3 bottom-4 z-20 px-3 py-2 rounded-xl bg-[#2a1410]/60 text-[#fbeed2] text-[12px] backdrop-blur-sm pointer-events-none transition-opacity duration-1000 ${keysHint ? 'opacity-100' : 'opacity-0'}`}>
+          ↑↓←→ walk · R turn back · Space use · B vái · P pray · F xăm · Tab places
+        </div>
+      )}
+      {/* until the mouse is captured, say how to look around */}
+      {!inRealm && !modal && !rite && !possessing && !arriving && !loading && !locked && !near && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-20 px-3 py-1 rounded-full bg-[#2a1410]/55 text-[#fbeed2] text-[12px] pointer-events-none">
+          Click to look around · R turn back
+        </div>
+      )}
+      {!inRealm && !modal && !rite && !possessing && !arriving && !loading && !keysHint && (
+        <div className="fixed left-3 bottom-4 z-20 w-6 h-6 flex items-center justify-center rounded-full bg-[#2a1410]/45 text-[#fbeed2]/80 text-[12px] font-bold pointer-events-none" title="? shows every key">
+          ?
         </div>
       )}
 

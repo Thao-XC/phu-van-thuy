@@ -33,15 +33,15 @@ export const Tracker: React.FC<{ getDistance: () => number | null; isNight: bool
   const { found } = useLuck();
   const secret = nextSecret(found);
   const idx = secret ? SECRETS.indexOf(secret) : SECRETS.length;
+  // folded to one quiet line by default; it opens by itself for a few seconds when a new riddle wakes
   const [open, setOpen] = useState(() => {
     try {
-      const v = localStorage.getItem('pvt_tracker');
-      if (v) return v !== '0';
+      return localStorage.getItem('pvt_tracker2') === '1';
     } catch {
-      /* ignore */
+      return false;
     }
-    return window.innerWidth >= 640;
   });
+  const [peek, setPeek] = useState(false);
   const [dist, setDist] = useState<number | null>(null);
   const [flash, setFlash] = useState(false);
   useEffect(() => {
@@ -52,41 +52,46 @@ export const Tracker: React.FC<{ getDistance: () => number | null; isNight: bool
   useEffect(() => {
     if (!found.length) return;
     setFlash(true);
+    setPeek(true);
     const t = window.setTimeout(() => setFlash(false), 2400);
-    return () => clearTimeout(t);
+    const p = window.setTimeout(() => setPeek(false), 9000);
+    return () => {
+      clearTimeout(t);
+      clearTimeout(p);
+    };
   }, [found.length]);
   const toggle = () => {
-    setOpen(!open);
+    const o = !(open || peek);
+    setOpen(o);
+    setPeek(false);
     try {
-      localStorage.setItem('pvt_tracker', open ? '0' : '1');
+      localStorage.setItem('pvt_tracker2', o ? '1' : '0');
     } catch {
       /* ignore */
     }
   };
   const w = secret && (secret.trigger !== 'night' || isNight) ? warmth(dist) : null;
+  const shown = open || peek;
 
   return (
-    <div className={`w-[min(300px,calc(100vw-1.5rem))] rounded-2xl dh-paper border shadow-lg text-[#2a1d14] transition-shadow ${flash ? 'border-[#e0a92a] shadow-[0_0_0_3px_rgba(224,169,42,0.35)]' : 'border-[#211a15]'}`}>
-      <button onClick={toggle} className="w-full flex items-center gap-2 px-3 py-2 cursor-pointer text-left" aria-expanded={open}>
+    <div className={`${shown ? 'w-[min(300px,calc(100vw-1.5rem))]' : 'w-auto max-w-[260px]'} rounded-2xl dh-paper border shadow-lg text-[#2a1d14] transition-shadow ${flash ? 'border-[#e0a92a] shadow-[0_0_0_3px_rgba(224,169,42,0.35)]' : 'border-[#211a15]'}`}>
+      <button onClick={toggle} className="w-full flex items-center gap-2 px-3 py-1.5 cursor-pointer text-left" aria-expanded={shown} title={secret ? `✦ ${secret.riddle}` : goal.title}>
         <Compass className="w-4 h-4 text-[#8e1b1b] shrink-0" />
         <span className="text-[13px] font-semibold truncate">{goal.title}</span>
         <span className="ml-auto flex items-center gap-1 text-[11px] font-semibold text-[#8a5a00] shrink-0">
           <Sparkles className="w-3.5 h-3.5" />
           {Math.min(idx, SECRETS.length)}/{SECRETS.length}
         </span>
-        {open ? <ChevronUp className="w-4 h-4 text-[#8a7762] shrink-0" /> : <ChevronDown className="w-4 h-4 text-[#8a7762] shrink-0" />}
+        {w && !shown && <span className={`w-1.5 h-1.5 rounded-full bg-current shrink-0 ${w.tone}`} aria-hidden />}
+        {shown ? <ChevronUp className="w-4 h-4 text-[#8a7762] shrink-0" /> : <ChevronDown className="w-4 h-4 text-[#8a7762] shrink-0" />}
       </button>
-      {!open && secret && (
-        <button onClick={toggle} className="w-full px-3 pb-2 -mt-1 text-left text-[12px] italic font-display text-[#5a4837] truncate cursor-pointer">✦ {secret.riddle}</button>
-      )}
-      {open && (
-        <div className="px-3 pb-3 -mt-1 space-y-2.5">
-          <p className="hidden sm:block text-[12px] leading-snug text-[#5a4837]">{goal.detail}</p>
+      {shown && (
+        <div className="px-3 pb-3 -mt-0.5 space-y-2">
           <div className="rounded-xl bg-[#fffaf0] border border-[#ecdcbc] p-2.5">
             {secret ? (
               <>
                 <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.14em] font-bold text-[#8e1b1b]">
-                  Secret {idx + 1} of {SECRETS.length}
+                  ✦ {idx + 1}/{SECRETS.length}
                   {secret.trigger === 'night' && (
                     <span className={`ml-auto flex items-center gap-1 normal-case tracking-normal font-semibold ${isNight ? 'text-[#4b5aa0]' : 'text-[#8a7762]'}`}>
                       <Moon className="w-3 h-3" /> {isNight ? 'Night has come' : 'Only at night'}
@@ -102,7 +107,6 @@ export const Tracker: React.FC<{ getDistance: () => number | null; isNight: bool
                       ))}
                     </span>
                     {w.label}
-                    {w.dots >= 3 && <span className="font-normal text-[#8a7762]">· linger a moment</span>}
                   </div>
                 )}
               </>
@@ -110,17 +114,12 @@ export const Tracker: React.FC<{ getDistance: () => number | null; isNight: bool
               <p className="text-[13px] leading-snug">Every secret of Phủ Vân Thủy is yours. The grounds are quiet and grateful.</p>
             )}
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <button onClick={() => onGuide('story')} className="px-2.5 py-1 dh-seal rounded text-[12px] font-semibold cursor-pointer" title="The firefly shows you where to go (G)">
-              ✦ Guide me <kbd className="hidden pointer-fine:inline ml-0.5 px-1 rounded border border-[#f3ead6]/50 text-[10px] font-sans">G</kbd>
+          <div className="flex items-center gap-3 text-[11px] text-[#6d5b49]">
+            <button onClick={() => onGuide('story')} className="flex items-center gap-1 cursor-pointer hover:text-[#8e1b1b]" title="The firefly shows you where to go">
+              <kbd className="px-1 rounded border border-[#211a15]/40 font-sans">G</kbd> guide
             </button>
-            {secret && (secret.trigger !== 'night' || isNight) && (
-              <button onClick={() => onGuide('secret')} className="px-2.5 py-1 rounded border-2 border-[#211a15] text-[12px] font-semibold cursor-pointer hover:bg-[#efe3c8]" title="Follow the firefly to the secret">
-                Show the secret
-              </button>
-            )}
-            <button onClick={onOpenTrail} className="text-[12px] font-semibold text-[#8e1b1b] underline underline-offset-2 cursor-pointer">
-              Trail
+            <button onClick={onOpenTrail} className="flex items-center gap-1 cursor-pointer hover:text-[#8e1b1b]">
+              <kbd className="px-1 rounded border border-[#211a15]/40 font-sans">T</kbd> trail
             </button>
           </div>
         </div>

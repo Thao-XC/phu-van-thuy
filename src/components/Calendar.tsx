@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Sun, Sunset, Moon } from 'lucide-react';
 import { Sheet } from './ui/Sheet';
 import { fmtHour, hourOf, type Session } from '../services/templeDay';
 import { toLunar, yearName, yearAnimal, festivalOn, nextFestival, today, FESTIVALS, type Festival, type LunarDate } from '../services/lunar';
@@ -58,6 +59,44 @@ export const CalendarChip: React.FC<{ onClick: () => void; now: Date; lunar: Lun
     </span>
   </button>
 );
+
+/**
+ * The temple clock, top right: the real time with a sun, dusk or moon for how the temple looks,
+ * and today's date in both calendars. Click (or the calendar key) for the festival sheet.
+ */
+export const TempleClock: React.FC<{ onClick: () => void; lunar: LunarDate; festival: Festival | null; tod: 'day' | 'twilight' | 'night'; live: boolean }> = ({ onClick, lunar, festival, tod, live }) => {
+  const [t, setT] = useState(() => today());
+  useEffect(() => {
+    const i = window.setInterval(() => setT(today()), 5000);
+    return () => clearInterval(i);
+  }, []);
+  const Icon = tod === 'day' ? Sun : tod === 'twilight' ? Sunset : Moon;
+  const hh = String(t.getHours()).padStart(2, '0');
+  const mm = String(t.getMinutes()).padStart(2, '0');
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-2 pl-2 pr-3 py-1 rounded-md cursor-pointer ${festival?.major ? 'dh-seal' : 'dh-paper'}`}
+      title={`${t.toDateString()} · ${lunarLabel(lunar)} ÂL${festival ? ` · ${festival.vi}` : ''}${live ? '' : ' · time held (press 4 for real time)'}`}
+      aria-label={`${hh}:${mm}, ${t.toDateString()}, lunar ${lunarLabel(lunar)}`}
+    >
+      <span className={`relative flex items-center justify-center w-7 h-7 rounded-full ${tod === 'night' ? 'bg-[#1c2340] text-[#f3e3a6]' : tod === 'twilight' ? 'bg-[#e8915a] text-[#fff4dc]' : 'bg-[#f2c14e] text-[#8e1b1b]'}`}>
+        <Icon className="w-4 h-4" />
+        {!live && <span className="absolute -right-0.5 -top-0.5 w-2 h-2 rounded-full bg-[#8a7762] border border-[#f6ead0]" />}
+      </span>
+      <span className="flex flex-col items-start leading-none">
+        <span className="font-display font-bold text-[17px] tabular-nums">
+          {hh}
+          <span className="animate-pulse">:</span>
+          {mm}
+        </span>
+        <span className="mt-0.5 text-[10px] opacity-75 tabular-nums whitespace-nowrap">
+          {t.getDate()}/{t.getMonth() + 1} · {lunar.day}/{lunar.month} ÂL
+        </span>
+      </span>
+    </button>
+  );
+};
 
 /** upcoming major festivals over the next year */
 function upcoming(from: Date, n = 6) {

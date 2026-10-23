@@ -189,7 +189,8 @@ export class Visitors {
   }
   update(dt: number, t: number, player: THREE.Vector3, visible: boolean) {
     for (const v of this.list) {
-      v.fig.visible = visible && !v.fig.userData.hidden;
+      // far-off visitors aren't drawn at all (each one is a few dozen pieces)
+      v.fig.visible = visible && !v.fig.userData.hidden && Math.hypot(player.x - v.fig.position.x, player.z - v.fig.position.z) < 42;
       if (!v.fig.visible) continue;
       const stop = v.route[v.i];
       if (v.wait > 0) {
