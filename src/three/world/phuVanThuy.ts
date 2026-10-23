@@ -74,7 +74,11 @@ export const phuVanThuy: Layout = (ctx) => {
   pond.position.set(POND.x, -0.25, POND.z - 0.5);
   ctx.scene.add(vk.lotus(46, (i) => {
     const a = (i * 2.399) % Math.PI, r = 1.2 + ((i * 53) % 60) / 10;
-    return [POND.x + Math.cos(a) * r, POND.z - 0.5 + Math.sin(a) * r];
+    const x = POND.x + Math.cos(a) * r;
+    let z = POND.z - 0.5 + Math.sin(a) * r;
+    // keep open water in front of the puppet stage, so the audience on the bank can see the show
+    if (x > -17.5 && Math.abs(z - 53.6) < 3) z = z < 53.6 ? 50.4 : 56.9;
+    return [x, z];
   }, -0.25));
   // stone rim on the straight side
   ctx.add(new THREE.Mesh(new THREE.BoxGeometry(POND.r * 2 + 0.6, 0.35, 0.5), v.stone), POND.x, POND.z - 0.75, 0, 0.1);
@@ -187,6 +191,7 @@ export const phuVanThuy: Layout = (ctx) => {
 
   // water-puppet pavilion on the lotus pond: the legend of the Mothers is told here
   const thuyDinh = vk.thuyDinh();
+  thuyDinh.name = 'thuyDinh';
   thuyDinh.position.set(-18.6, 0, 53.6);
   thuyDinh.rotation.y = Math.PI / 2;
   ctx.scene.add(thuyDinh);

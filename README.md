@@ -59,6 +59,11 @@ autumn seasons, and all day on great festivals; see the calendar). Kneel on the 
 five spirits in turn, each with their own costume, props, dance and coloured aura; keep the beat with the phách to make
 the aura bloom, or just watch.
 
+**Múa rối nước.** Press Space at the Thủy đình on the lotus pond to sit on the bank and watch a two-minute
+water-puppet show: Chú Tễu opens it and chats in a speech bubble, dragons rear up and spray water, four fairies dance,
+a buffalo ploughs and rice seedlings rise row by row, a fisherman lands a leaping fish, and everyone bows. Space claps
+(Tễu waves back), Esc leaves. The legend film is still on L.
+
 **Thanh đồng.** Touch the medium during a hầu đồng and they stop and turn to you. Touch them again and you are inside:
 the red veil over your eyes, the hall dark and muffled, your own heart too loud, shapes with candle eyes gathering round
 the mat and whispering. A voice tells you to breathe with the drum (hold Space or the mouse) and let Her in. Then the veil

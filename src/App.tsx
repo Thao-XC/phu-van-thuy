@@ -7,6 +7,7 @@ import type { StoryCard } from './three/encounters/types';
 import { Landing } from './components/Landing';
 import type { RitualKey } from './components/Dock';
 import { PlacesPicker } from './components/Places';
+import { PuppetSight, createPuppetBus } from './components/PuppetSight';
 import { KeeperTalk } from './components/Keeper';
 import { JournalSheet } from './components/Journal';
 import { Tracker } from './components/Trail';
@@ -30,7 +31,7 @@ import { useBackLayer } from './services/backStack';
 import { PALACES, type PalaceId } from './data/story';
 import { XAM_TIER, type LocKind, type Xam } from './data/rituals';
 
-type Modal = 'keeper' | 'incense' | 'altar' | 'fortune' | 'furnace' | 'stall' | 'journal' | 'settings' | 'controls' | 'lantern' | 'film' | 'calendar' | 'haudong' | 'places' | null;
+type Modal = 'keeper' | 'incense' | 'altar' | 'fortune' | 'furnace' | 'stall' | 'journal' | 'settings' | 'controls' | 'lantern' | 'film' | 'calendar' | 'haudong' | 'places' | 'puppets' | null;
 
 const PROMPT: Record<string, string> = {
   gate: 'Vái before the gate',
@@ -43,7 +44,7 @@ const PROMPT: Record<string, string> = {
   stall: 'Receive lộc',
   river: 'Float a lantern',
   haudong: 'Sit and watch the hầu đồng',
-  theatre: 'Watch the legend of the Mothers',
+  theatre: 'Watch the water puppets',
 };
 
 /** the boat brings you only once per visit to the page */
@@ -82,6 +83,8 @@ export default function App() {
   // the key list shows for 20 seconds after arriving, then steps out of the way
   const [keysHint, setKeysHint] = useState(true);
   // talking to Bà Thủ Từ: face her, and keep her bubble over her head
+  const puppetBus = useMemo(() => createPuppetBus(), []);
+  const teuAnchor = useCallback(() => scene.current?.project('teu', 1.15) ?? null, []);
   const keeperAnchor = useCallback(() => scene.current?.project('keeper', 1.72) ?? null, []);
   useEffect(() => {
     scene.current?.talkTo(modal === 'keeper' ? 'keeper' : null, 1.42);
@@ -143,6 +146,7 @@ export default function App() {
       },
       onReady: () => setLoading(false),
       onGaze: setGaze,
+      onPuppet: (e) => puppetBus.emit(e),
       onPossess: (e) => {
         if (e.type === 'touch') {
           setTouchWarn((n) => n + 1);
@@ -393,7 +397,11 @@ export default function App() {
     if (k === 'gate') return scene.current?.bow();
     if (k === 'bell') return ringBell();
     if (k === 'river') return setModal('lantern');
-    if (k === 'theatre') return setModal('film');
+    if (k === 'theatre') {
+      // múa rối nước: sit on the bank and watch
+      if (scene.current?.startPuppets()) setModal('puppets');
+      return;
+    }
     if (k === 'haudong') {
       if (hd.on) {
         const c = scene.current?.startWatching();
@@ -632,7 +640,7 @@ export default function App() {
       )}
 
       {/* top-left: back, place */}
-      <div className={`fixed top-[max(0.75rem,env(safe-area-inset-top))] left-3 z-30 flex items-center gap-2 ${modal === 'haudong' || possessing ? 'hidden' : ''}`}>
+      <div className={`fixed top-[max(0.75rem,env(safe-area-inset-top))] left-3 z-30 flex items-center gap-2 ${modal === 'haudong' || modal === 'puppets' || possessing ? 'hidden' : ''}`}>
         <button
           onClick={() => (inRealm ? scene.current?.leaveLegend() : setView('landing'))}
           className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl dh-paper border border-[#211a15] text-[#2a1d14] text-xs font-semibold shadow-md cursor-pointer hover:border-[#8e1b1b]"
@@ -646,7 +654,7 @@ export default function App() {
       </div>
 
       {/* top-right: phúc, scarves, journal, sound */}
-      <div className={`fixed top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-30 flex items-center gap-1.5 sm:gap-2 ${modal === 'haudong' || possessing ? 'hidden' : ''}`}>
+      <div className={`fixed top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-30 flex items-center gap-1.5 sm:gap-2 ${modal === 'haudong' || modal === 'puppets' || possessing ? 'hidden' : ''}`}>
         <TempleClock lunar={cal.lunar} festival={cal.festival} tod={time} live={live} onClick={() => setModal('calendar')} />
         <LuckChip onClick={() => setShowPhuc(true)} compact />
         <button onClick={() => openJournal()} className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-xl dh-paper border border-[#211a15] shadow-md cursor-pointer hover:border-[#8e1b1b]" aria-label={`Journal: ${story.khan.length} of 4 scarves`}>
@@ -675,7 +683,7 @@ export default function App() {
       </div>
 
       {/* objective tracker: story goal + the current secret's riddle */}
-      {!inRealm && !loading && !arriving && modal !== 'haudong' && !rite && !possessing && (
+      {!inRealm && !loading && !arriving && modal !== 'haudong' && modal !== 'puppets' && !rite && !possessing && (
         <div className={`fixed left-3 top-[calc(max(0.75rem,env(safe-area-inset-top))+3rem)] z-20 ${modal ? 'hidden sm:block' : ''}`}>
           <Tracker getDistance={getSecretDistance} isNight={time === 'night'} onOpenTrail={() => openJournal('trail')} onGuide={guide} />
         </div>
@@ -779,7 +787,7 @@ export default function App() {
       )}
 
       {/* PC: minimap under the top bar, crosshair while the mouse is captured, key hints */}
-      {!inRealm && !arriving && modal !== 'haudong' && !possessing && settings.minimap && spots.length > 0 && (
+      {!inRealm && !arriving && modal !== 'haudong' && modal !== 'puppets' && !possessing && settings.minimap && spots.length > 0 && (
         <div className="hidden lg:block fixed right-3 top-16 z-20">
           <Minimap spots={spots} getPlayer={getPlayer} onGo={(id) => scene.current?.teleportToSpot(id)} near={near?.id} />
         </div>
@@ -814,6 +822,16 @@ export default function App() {
           <kbd className="px-1.5 py-0.5 rounded bg-[#b8382b] text-[11px] font-bold text-[#f3ead6]">Space</kbd>
           {PROMPT[near.type]}
         </div>
+      )}
+      {modal === 'puppets' && (
+        <PuppetSight
+          bus={puppetBus}
+          anchor={teuAnchor}
+          onClose={() => {
+            scene.current?.stopPuppets();
+            setModal(null);
+          }}
+        />
       )}
       {modal === 'places' && (
         <PlacesPicker

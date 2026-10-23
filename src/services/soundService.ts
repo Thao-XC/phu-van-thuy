@@ -803,6 +803,93 @@ class SoundService {
     this.pos = null;
   }
 
+  /* ---------------- múa rối nước: the water-puppet band ---------------- */
+  private pup: { timer: number; next: number; step: number; phrase: number } | null = null;
+  /** sáo trúc: a bamboo flute note with vibrato and a breath of air */
+  private flute(f: number, at: number, dur: number, vol = 0.07) {
+    const ctx = this.ctx;
+    if (!ctx || this.isMuted) return;
+    const o = ctx.createOscillator(), g = ctx.createGain(), lfo = ctx.createOscillator(), lg = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f * 0.985, at);
+    o.frequency.linearRampToValueAtTime(f, at + 0.06);
+    lfo.frequency.value = 5.5;
+    lg.gain.setValueAtTime(0, at);
+    lg.gain.linearRampToValueAtTime(f * 0.012, at + dur * 0.5);
+    lfo.connect(lg);
+    lg.connect(o.frequency);
+    g.gain.setValueAtTime(0, at);
+    g.gain.linearRampToValueAtTime(vol, at + 0.05);
+    g.gain.setValueAtTime(vol, at + dur * 0.75);
+    g.gain.linearRampToValueAtTime(0, at + dur);
+    o.connect(g);
+    g.connect(ctx.destination);
+    o.start(at);
+    lfo.start(at);
+    o.stop(at + dur + 0.05);
+    lfo.stop(at + dur + 0.05);
+  }
+  /** đàn bầu: the monochord's sliding voice */
+  private danBau(f: number, at: number, dur: number) {
+    this.tone(f, at, dur, 0.06, 'sine', f * (Math.random() < 0.5 ? 1.12 : 0.9));
+    this.tone(f * 2, at, dur * 0.6, 0.02, 'sine');
+  }
+  public startPuppetMusic() {
+    const ctx = this.initContext();
+    if (!ctx || this.pup) return;
+    this.pup = { timer: 0, next: ctx.currentTime + 0.2, step: 0, phrase: 0 };
+    const beat = 0.25;
+    // hò xự xang xê cống on G
+    const sc = [392, 440, 523.3, 587.3, 659.3, 784, 880];
+    const tunes = [
+      [0, 2, 3, 4, 3, 2, 1, 0],
+      [4, 5, 4, 3, 2, 3, 4, -1],
+      [2, 3, 4, 6, 5, 4, 3, 2],
+      [3, 2, 1, 0, 1, 2, 0, -1],
+    ];
+    const tick = () => {
+      const p = this.pup, c = this.ctx;
+      if (!p || !c) return;
+      while (p.next < c.currentTime + 0.3) {
+        const t = p.next, s = p.step;
+        // trống cơm and the mõ: a skipping village rhythm
+        if (s % 8 === 0 || s % 8 === 3 || s % 8 === 6) this.tone(s % 8 === 0 ? 150 : 190, t, 0.18, 0.18, 'sine', 110);
+        if (s % 2 === 1) this.tone(950, t, 0.05, 0.06, 'triangle', 800);
+        if (s % 16 === 0) this.boom(t, 0.18, 62);
+        // the flute sings a phrase every two bars, the đàn bầu answers
+        if (s % 2 === 0) {
+          const tune = tunes[p.phrase % tunes.length];
+          const n = tune[(s / 2) % 8];
+          if (Math.floor(s / 16) % 2 === 0) {
+            if (n >= 0) this.flute(sc[n], t, beat * 1.9);
+          } else if (s % 4 === 0 && n >= 0) this.danBau(sc[n] / 2, t, beat * 3.5);
+        }
+        if (s % 16 === 15) p.phrase++;
+        p.step++;
+        p.next += beat;
+      }
+    };
+    tick();
+    this.pup.timer = window.setInterval(tick, 100);
+  }
+  public stopPuppetMusic() {
+    if (this.pup) clearInterval(this.pup.timer);
+    this.pup = null;
+  }
+  /** each act opens with a drum roll and a cymbal-ish crash */
+  public puppetCue(i: number) {
+    const ctx = this.initContext();
+    if (!ctx || this.isMuted) return;
+    const t0 = ctx.currentTime;
+    for (let k = 0; k < 8; k++) this.tone(170 + k * 4, t0 + k * 0.06, 0.12, 0.08 + k * 0.015, 'sine', 120);
+    this.noise(0.9, 6000, 0.7, 0.12, 0.005, 'highpass');
+    if (i === 0) this.playTempleGong();
+  }
+  /** a dragon spits water */
+  public puppetSpray() {
+    this.noise(0.6, 2500, 0.8, 0.12, 0.02, 'bandpass');
+  }
+
   private chauVanTimer: number | null = null;
   private cvVol = 1;
   /** distant or close: the hầu đồng music fades with distance from the hall */

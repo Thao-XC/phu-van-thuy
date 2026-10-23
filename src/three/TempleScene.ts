@@ -11,6 +11,7 @@ import type { GroundFn, LayoutCtx, LayoutResult, ParticleKind, SecretDef, Etique
 import type { EncounterDef, EncounterEvent, EncounterRuntime, StoryCard, EncounterApi } from './encounters/types';
 import { Firefly, Visitors, Arrival, Ceremony, type GiaLook } from './living';
 import { Possession, type PossessEvent } from './possession';
+import { PuppetShow, type PuppetEvent } from './puppets';
 import { HallAtmosphere } from './atmosphere';
 import { Hands, Rite, BowRite, IncenseRite, XamRite, type RiteHost } from './fpv';
 import { WORLD } from './world/phuVanThuy';
@@ -42,6 +43,8 @@ export interface SceneCallbacks {
   onRiteDone?: (r: { kind: string; n?: number }) => void;
   /** inside the medium: phases, lines that surface, prompts; and the first warning touch */
   onPossess?: (e: PossessEvent | { type: 'touch' }) => void;
+  /** the water-puppet show: acts, Tễu's lines, the end */
+  onPuppet?: (e: PuppetEvent) => void;
   /** a floating place marker was clicked */
   onSpotClick?: (spotId: string) => void;
   /** PC: the place marker under the crosshair changed */
@@ -595,6 +598,13 @@ export class TempleScene {
     // typing in a text box (the keeper's chat, a petition) never moves or acts in the world
     const tgt = e.target as HTMLElement | null;
     if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.tagName === 'SELECT' || tgt.isContentEditable)) return;
+    if (this.puppets) {
+      if (e.code === 'Space' && !e.repeat) {
+        e.preventDefault();
+        this.puppets.clap();
+      }
+      return;
+    }
     if (this.possession) {
       if (e.code === 'Escape') this.possession.skip();
       else if ((e.code === 'Space' || e.code === 'Enter') && !e.repeat) {
@@ -684,6 +694,10 @@ export class TempleScene {
   }
 
   private onPointerDown = (e: PointerEvent) => {
+    if (this.puppets) {
+      this.puppets.clap();
+      return;
+    }
     if (this.possession) {
       this.possession.press(true);
       this.isDragging = true;
@@ -885,6 +899,17 @@ export class TempleScene {
    * Update Player Movement & Camera Position
    */
   private updatePlayerMovement(delta: number) {
+    if (this.puppets && this.puppetSeat) {
+      // on the bank of the pond, watching the stage
+      const w = this.puppetSeat;
+      w.t = Math.min(1, w.t + delta * 0.7);
+      const e = w.t * w.t * (3 - 2 * w.t);
+      this.camera.position.lerpVectors(w.from, w.to, e);
+      this._proj.lerpVectors(w.fromLook, w.look, e);
+      this.camera.lookAt(this._proj);
+      this.puppets.update(delta);
+      return;
+    }
     if (this.possession) {
       if (!this.possession.update(delta, this.elapsed)) this.wake();
       this.setRes(this.possession ? this.possession.res : 1);
@@ -1479,13 +1504,15 @@ export class TempleScene {
   public project(name: string, y = 1.8): { x: number; y: number; on: boolean } | null {
     const o = this.scene.getObjectByName(name);
     if (!o) return null;
+    let shown = true;
+    for (let p: THREE.Object3D | null = o; p; p = p.parent) if (!p.visible) shown = false;
     o.updateMatrixWorld(true);
     this._proj.setFromMatrixPosition(o.matrixWorld);
     this._proj.y += y;
     const behind = this._proj.clone().sub(this.camera.position).dot(this.camera.getWorldDirection(new THREE.Vector3())) < 0;
     this._proj.project(this.camera);
     const r = this.renderer.domElement.getBoundingClientRect();
-    return { x: r.left + ((this._proj.x + 1) / 2) * r.width, y: r.top + ((1 - this._proj.y) / 2) * r.height, on: !behind && Math.abs(this._proj.x) < 1.05 && Math.abs(this._proj.y) < 1.05 };
+    return { x: r.left + ((this._proj.x + 1) / 2) * r.width, y: r.top + ((1 - this._proj.y) / 2) * r.height, on: shown && !behind && Math.abs(this._proj.x) < 1.05 && Math.abs(this._proj.y) < 1.05 };
   }
 
   private updateRite(dt: number) {
@@ -1682,6 +1709,47 @@ export class TempleScene {
     this.kneelTarget = 0.75;
     setTimeout(() => (this.kneelTarget = 0), 3200);
     this.callbacks.onPossess?.({ type: 'phase', phase: 'done' });
+  }
+
+  /* ---------------- múa rối nước ---------------- */
+  private puppets: PuppetShow | null = null;
+  private puppetSeat: { from: THREE.Vector3; to: THREE.Vector3; fromLook: THREE.Vector3; look: THREE.Vector3; t: number } | null = null;
+  /** sit on the bank and watch a water-puppet show */
+  public startPuppets(): boolean {
+    const stage = this.scene.getObjectByName('thuyDinh');
+    if (!stage || this.puppets || this.enc) return false;
+    this.cancelRite();
+    this.releasePointer();
+    (stage.userData.puppets as THREE.Object3D).visible = false;
+    this.puppets = new PuppetShow(stage, (e) => this.callbacks.onPuppet?.(e));
+    stage.updateMatrixWorld(true);
+    // low on the bank, close to the water, the stage filling the view
+    const to = stage.localToWorld(new THREE.Vector3(0, 0, 8.4));
+    to.y = 0.75;
+    const look = stage.localToWorld(new THREE.Vector3(0, 0.45, 3.4));
+    this.camera.getWorldDirection(this._fwd);
+    this.puppetSeat = { from: this.camera.position.clone(), to, fromLook: this.camera.position.clone().add(this._fwd), look, t: 0 };
+    soundService.setChauVanVolume(0);
+    return true;
+  }
+  public stopPuppets() {
+    const stage = this.scene.getObjectByName('thuyDinh');
+    this.puppets?.dispose();
+    this.puppets = null;
+    if (stage) (stage.userData.puppets as THREE.Object3D).visible = true;
+    if (this.puppetSeat) {
+      // stand up where you sat, still facing the stage
+      // back on the path at the edge of the pond
+      const p = this.puppetSeat.from;
+      this.playerPosition.set(p.x, 1.7 + this.ground(p.x, p.z), p.z);
+      const d = this.puppetSeat.look.clone().sub(p);
+      this.playerRotationY = Math.atan2(-d.x, -d.z);
+      this.playerPitch = -0.05;
+    }
+    this.puppetSeat = null;
+  }
+  public get watchingPuppets() {
+    return !!this.puppets;
   }
 
   /** carry a Mid-Autumn star lantern */
@@ -1885,7 +1953,7 @@ export class TempleScene {
   private updateMarkers() {
     for (const m of this.markers) {
       const d = Math.hypot(this.playerPosition.x - m.g.position.x, this.playerPosition.z - m.g.position.z);
-      const show = !this.enc && !this.isCinematicMode && !this.arriving && !this.watching && d > 3.8 && d < 20;
+      const show = !this.enc && !this.isCinematicMode && !this.arriving && !this.watching && !this.puppets && d > 3.8 && d < 20;
       m.g.visible = show;
       if (!show) continue;
       m.g.position.y = m.baseY + Math.sin(this.elapsed * 2 + m.g.position.x) * 0.08;
