@@ -148,6 +148,9 @@ export const Landing: React.FC<{ onEnter: () => void; onWatch: () => void }> = (
       {/* the name */}
       <div className="absolute inset-x-0 top-[9vh] flex flex-col items-center text-center pointer-events-none px-4">
         <h1 className="font-display font-bold text-[clamp(3rem,9vw,7.5rem)] leading-none text-[#fff4dc] drop-shadow-[0_4px_24px_rgba(0,0,0,0.6)] title-in">Phủ Vân Thủy</h1>
+        <div className="mt-2 text-[clamp(.7rem,1.3vw,.95rem)] uppercase tracking-[0.32em] text-[#e9c98a] drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] title-in" style={{ animationDelay: '.2s' }}>
+          The Palace of Clouds and Water
+        </div>
         <p className="mt-3 font-display italic text-[clamp(1rem,2vw,1.4rem)] text-[#f2d9a8] drop-shadow-[0_2px_10px_rgba(0,0,0,0.7)] title-in" style={{ animationDelay: '.4s' }}>
           Four scarves are lost. The Mothers are waiting.
         </p>

@@ -1,4 +1,4 @@
-# Phủ Vân Thủy
+# Phủ Vân Thủy · The Palace of Clouds and Water
 
 A 3D, first-person visit to a fictional Vietnamese Mother Goddess temple (Đạo Mẫu, the Four Palaces).
 Made for PC browsers: keyboard and mouse.

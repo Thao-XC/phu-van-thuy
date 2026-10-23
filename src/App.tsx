@@ -743,7 +743,7 @@ export default function App() {
             <div className="dh-paper px-8 py-4 rounded-sm">
               <div className="text-[11px] uppercase tracking-[0.3em] text-[#8f2a21] font-semibold">Phủ thờ Mẫu</div>
               <div className="dh-title text-3xl sm:text-4xl text-[#211a15] mt-1">Phủ Vân Thủy</div>
-              <div className="font-display italic text-sm text-[#4a3826] mt-1">Dusk, on a river bend beneath the mountains</div>
+              <div className="text-[11px] uppercase tracking-[0.28em] text-[#8f2a21] mt-1">The Palace of Clouds and Water</div>
             </div>
           </div>
           <button onClick={() => scene.current?.skipArrival()} className="pointer-events-auto absolute right-4 bottom-[3.5vh] px-3 py-1.5 rounded text-[13px] text-[#fbeed2] border border-white/30 hover:bg-white/10 cursor-pointer">
