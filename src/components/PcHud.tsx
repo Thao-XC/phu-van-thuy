@@ -77,6 +77,9 @@ export const SettingsSheet: React.FC<{ value: Settings; onChange: (s: Settings) 
           <Toggle on={value.minimap} onToggle={() => set('minimap', !value.minimap)} label="Minimap" />
         </Row>
       </div>
+      <button onClick={() => onChange(DEFAULT_SETTINGS)} className="mt-3 mb-1 text-[13px] font-semibold text-[#8e1b1b] underline underline-offset-2 cursor-pointer">
+        Reset to defaults
+      </button>
     </Sheet>
   );
 };

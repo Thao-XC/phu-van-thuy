@@ -238,13 +238,11 @@ export class Possession {
       this.once('a', 1.5, () => this.line('mau', '…ai gọi con?', '…who called you?'));
       this.once('b', 6.5, () => this.line('mau', 'Con không được chọn. Vậy mà con đến.', 'You were not chosen. Yet you came.'));
       this.once('c', 12, () => this.line('mau', 'Đừng mở mắt. Họ đang ngồi quanh con.', 'Do not open your eyes. They are sitting all around you.'));
-      this.once('d', 17, () => {
-        this.line('mau', 'Thở theo tiếng trống. Để ta vào.', 'Breathe with the drum. Let me in.');
-        this.emit({ type: 'prompt', text: 'Hold Space or the mouse · breathe with the drum' });
-      });
+      this.once('p', 3, () => this.emit({ type: 'prompt', text: 'Hold Space or the mouse · breathe with the drum' }));
+      this.once('d', 17, () => this.line('mau', 'Thở theo tiếng trống. Để ta vào.', 'Breathe with the drum. Let me in.'));
       // the shades gather
       if (t > 5 && this.shades.length < 16 && t > 5 + this.shades.length * 0.9) this.shades.push(this.shade(this.shades.length));
-      if (t > 17) {
+      if (t > 3) {
         if (this.holding) {
           this.breath = Math.min(1, this.breath + dt / 9);
           this.heart = Math.max(76, this.heart - dt * 9);

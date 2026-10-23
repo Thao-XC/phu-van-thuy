@@ -101,7 +101,7 @@ export const KeeperTalk: React.FC<{
   useEffect(() => {
     if (mode !== 'say' || !line) return;
     if (shown >= line.text.length) return;
-    const t = window.setTimeout(() => setShown((n) => Math.min(line.text.length, n + 2)), 28);
+    const t = window.setTimeout(() => setShown((n) => Math.min(line.text.length, n + 3)), 16);
     return () => clearTimeout(t);
   }, [mode, line, shown]);
 
@@ -188,6 +188,12 @@ export const KeeperTalk: React.FC<{
         e.preventDefault();
         e.stopImmediatePropagation();
         advance();
+      } else if (mode === 'say' && (key === 's' || key === 'S') && queue.length > 1) {
+        // skip the rest of what she's saying
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        setIdx(queue.length - 1);
+        setShown(queue[queue.length - 1].text.length);
       } else if (mode === 'pledge' && (key === ' ' || key === 'Enter' || key === '1')) {
         e.preventDefault();
         e.stopImmediatePropagation();
@@ -204,7 +210,7 @@ export const KeeperTalk: React.FC<{
     };
     window.addEventListener('keydown', k, true);
     return () => window.removeEventListener('keydown', k, true);
-  }, [mode, advance, choose, sel]);
+  }, [mode, advance, choose, sel, queue]);
 
   // Esc: from asking, back to the questions; otherwise end the conversation
   useBackLayer(true, () => {
@@ -224,8 +230,8 @@ export const KeeperTalk: React.FC<{
       const el = bubble.current;
       const w = el?.offsetWidth ?? 340, h = el?.offsetHeight ?? 120;
       if (a) {
-        const x = Math.max(w / 2 + 12, Math.min(innerWidth - w / 2 - 12, a.x));
-        const y = Math.max(h + 16, Math.min(innerHeight - 140, a.y));
+        const x = a.on ? Math.max(w / 2 + 12, Math.min(innerWidth - w / 2 - 12, a.x)) : innerWidth / 2;
+        const y = a.on ? Math.max(h + 16, Math.min(innerHeight - 140, a.y)) : h + 70;
         setPos((p) => (Math.abs(p.x - x) + Math.abs(p.y - y) < 0.5 && p.on === a.on ? p : { x, y, dx: Math.max(-w / 2 + 30, Math.min(w / 2 - 30, a.x - x)), on: a.on }));
       }
       raf = requestAnimationFrame(tick);
@@ -262,9 +268,10 @@ export const KeeperTalk: React.FC<{
                 ))}
               </div>
             )}
-            {mode === 'say' && !typing && (
-              <span className="absolute right-3 bottom-1.5 text-[12px] font-bold manga-next" style={{ fontFamily: 'Be Vietnam Pro, sans-serif' }}>
-                ▼ <span className="opacity-60">Space</span>
+            {mode === 'say' && (
+              <span className="absolute right-3 -bottom-7 flex gap-2 text-[11px] font-bold text-[#fffdf7] [text-shadow:0_1px_3px_#000]" style={{ fontFamily: 'Be Vietnam Pro, sans-serif' }}>
+                {queue.length > 1 && idx < queue.length - 1 && <span className="opacity-80">S skip</span>}
+                <span className={typing ? 'opacity-60' : 'manga-next'}>▼ Space</span>
               </span>
             )}
             {pos.on && <Tail dx={pos.dx} />}

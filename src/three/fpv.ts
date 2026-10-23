@@ -526,6 +526,11 @@ export class IncenseRite extends Rite {
       else this.ev.hint(`${this.n} stick${this.n > 1 ? 's' : ''} in your hands. Click for more, or press Enter to light them. Odd numbers are for the living.`);
       return;
     }
+    if (this.needRelease) {
+      if (!down) this.needRelease = false;
+      this.holding = false;
+      return;
+    }
     this.holding = down;
     if (this.step === 'pray' && !down && this.raisedFor > 0.25) {
       this.bows++;
@@ -546,6 +551,8 @@ export class IncenseRite extends Rite {
     }
   }
   private raisedFor = 0;
+  /** the hold that lit the incense must be let go before the bows begin */
+  private needRelease = false;
   private toLight() {
     this.step = 'light';
     this.host.hands.pose('joined');
@@ -566,10 +573,12 @@ export class IncenseRite extends Rite {
         this.glow = Math.min(1, this.glow + dt * 0.7);
         if (this.glow >= 1) {
           this.step = 'pray';
+          this.holding = false;
+          this.needRelease = true;
           this.host.sound.burn();
           this.lamp.g.visible = false;
           H.pose('joined');
-          this.ev.hint('Raise the incense to your forehead (hold), then release to bow. 0/3');
+          this.ev.hint('Lit. Let go, then raise the incense to your forehead (hold) and release to bow. 0/3');
         }
       }
     }
@@ -639,8 +648,10 @@ export class XamRite extends Rite {
     if (this.step !== 'shake' || dir === this.lastDir) return;
     this.lastDir = dir;
     this.tilt = dir * 0.28;
-    this.power = Math.min(1, this.power + 0.07);
+    this.power = Math.min(1, this.power + 0.13);
     this.host.sound.rattle();
+    const bars = Math.round(this.power * 8);
+    if (this.power < 1) this.ev.hint(`Shake ← → ${'▮'.repeat(bars)}${'▯'.repeat(8 - bars)}${this.power > 0.7 ? '  almost…' : ''}`);
     if (this.power >= 1) {
       this.step = 'fall';
       const s = this.tube.sticks[7];

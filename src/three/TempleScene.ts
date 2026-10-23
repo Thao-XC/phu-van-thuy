@@ -1886,6 +1886,17 @@ export class TempleScene {
     this.shimmer.visible = false;
   }
   /** metres to the active secret (null if none / inside a realm) */
+  /** which way the waking secret lies from where you're facing: ahead, behind, left or right */
+  public get activeSecretDir(): string | null {
+    const d = this.secrets.find((x) => x.id === this.activeSecret);
+    if (!d || this.enc) return null;
+    const dx = d.at[0] - this.playerPosition.x, dz = d.at[1] - this.playerPosition.z;
+    let a = Math.atan2(-dx, -dz) - this.playerRotationY;
+    a = Math.atan2(Math.sin(a), Math.cos(a));
+    if (Math.abs(a) < Math.PI / 4) return 'ahead';
+    if (Math.abs(a) > (3 * Math.PI) / 4) return 'behind you';
+    return a > 0 ? 'to your left' : 'to your right';
+  }
   public get activeSecretDistance(): number | null {
     const d = this.secrets.find((x) => x.id === this.activeSecret);
     if (!d || this.enc) return null;

@@ -345,6 +345,7 @@ export default function App() {
     return () => clearTimeout(t);
   }, [unlocked, card, modal]);
   const getSecretDistance = useCallback(() => scene.current?.activeSecretDistance ?? null, []);
+  const getSecretDir = useCallback(() => scene.current?.activeSecretDir ?? null, []);
   const openJournal = (t: typeof journalTab = 'story') => {
     setJournalTab(t);
     setModal('journal');
@@ -377,7 +378,14 @@ export default function App() {
   });
   useBackLayer(view === 'temple' && arriving, () => scene.current?.skipArrival());
   // Back / Esc: leave a realm first, then the temple itself
-  useBackLayer(view === 'temple', () => setView('landing'));
+  // Esc with nothing open: the first press only frees the mouse and asks; a second press within 3 s leaves
+  const leaveAsk = useRef(0);
+  useBackLayer(view === 'temple', () => {
+    if (performance.now() - leaveAsk.current < 3000) return setView('landing');
+    leaveAsk.current = performance.now();
+    scene.current?.releasePointer();
+    showCaption('Press Esc again to leave the temple.', 3);
+  });
   useBackLayer(inRealm, () => scene.current?.leaveLegend());
   useBackLayer(possessing, () => scene.current?.skipPossession());
 
@@ -685,13 +693,13 @@ export default function App() {
       {/* objective tracker: story goal + the current secret's riddle */}
       {!inRealm && !loading && !arriving && modal !== 'haudong' && modal !== 'puppets' && !rite && !possessing && (
         <div className={`fixed left-3 top-[calc(max(0.75rem,env(safe-area-inset-top))+3rem)] z-20 ${modal ? 'hidden sm:block' : ''}`}>
-          <Tracker getDistance={getSecretDistance} isNight={time === 'night'} onOpenTrail={() => openJournal('trail')} onGuide={guide} />
+          <Tracker getDistance={getSecretDistance} getDir={getSecretDir} isNight={time === 'night'} onOpenTrail={() => openJournal('trail')} onGuide={guide} />
         </div>
       )}
 
       {/* what your hands do next */}
       {riteHint && (
-        <div className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-30 max-w-[min(620px,92vw)] px-4 py-1.5 rounded-full bg-[#140b08]/55 backdrop-blur-sm text-center pointer-events-none rite-hint" key={riteHint}>
+        <div className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-30 max-w-[min(620px,92vw)] px-4 py-1.5 rounded-full bg-[#140b08]/55 backdrop-blur-sm text-center pointer-events-none rite-hint" key={riteHint.replace(/[▮▯].*$/, '')}>
           <p className="text-[13px] leading-snug text-[#fbeed2]">
             {riteHint} <span className="opacity-60">· Esc</span>
           </p>

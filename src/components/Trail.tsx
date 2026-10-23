@@ -16,19 +16,20 @@ export function useStoryGoal(): { title: string; detail: string } {
   return { title: 'The Mother is at peace', detail: 'Wander as long as you like. The grounds still keep secrets.' };
 }
 
-const warmth = (d: number | null) => {
+const warmth = (d: number | null, dir: string | null) => {
   if (d == null) return null;
+  const way = dir ? ` · ${dir}` : '';
   if (d < 4) return { label: 'Right here', dots: 4, tone: 'text-[#d98b00]' };
-  if (d < 10) return { label: 'Very close', dots: 3, tone: 'text-[#c47a00]' };
-  if (d < 22) return { label: 'Getting warm', dots: 2, tone: 'text-[#8a6a2a]' };
-  return { label: 'Somewhere else', dots: 1, tone: 'text-[#8a7762]' };
+  if (d < 10) return { label: `Very close${way}`, dots: 3, tone: 'text-[#c47a00]' };
+  if (d < 22) return { label: `Getting warm${way}`, dots: 2, tone: 'text-[#8a6a2a]' };
+  return { label: `Far${way}`, dots: 1, tone: 'text-[#8a7762]' };
 };
 
 /**
  * Objective tracker, top-left under the back button: the story goal and the current secret's riddle.
  * Secrets unlock one at a time; a warmth meter tells you whether you're near.
  */
-export const Tracker: React.FC<{ getDistance: () => number | null; isNight: boolean; onOpenTrail: () => void; onGuide: (what: 'story' | 'secret') => void }> = ({ getDistance, isNight, onOpenTrail, onGuide }) => {
+export const Tracker: React.FC<{ getDistance: () => number | null; getDir?: () => string | null; isNight: boolean; onOpenTrail: () => void; onGuide: (what: 'story' | 'secret') => void }> = ({ getDistance, getDir, isNight, onOpenTrail, onGuide }) => {
   const goal = useStoryGoal();
   const { found } = useLuck();
   const secret = nextSecret(found);
@@ -43,11 +44,15 @@ export const Tracker: React.FC<{ getDistance: () => number | null; isNight: bool
   });
   const [peek, setPeek] = useState(false);
   const [dist, setDist] = useState<number | null>(null);
+  const [dir, setDir] = useState<string | null>(null);
   const [flash, setFlash] = useState(false);
   useEffect(() => {
-    const t = window.setInterval(() => setDist(getDistance()), 400);
+    const t = window.setInterval(() => {
+      setDist(getDistance());
+      setDir(getDir?.() ?? null);
+    }, 400);
     return () => clearInterval(t);
-  }, [getDistance]);
+  }, [getDistance, getDir]);
   // a little glow whenever a new riddle unlocks
   useEffect(() => {
     if (!found.length) return;
@@ -70,7 +75,7 @@ export const Tracker: React.FC<{ getDistance: () => number | null; isNight: bool
       /* ignore */
     }
   };
-  const w = secret && (secret.trigger !== 'night' || isNight) ? warmth(dist) : null;
+  const w = secret && (secret.trigger !== 'night' || isNight) ? warmth(dist, dir) : null;
   const shown = open || peek;
 
   return (
