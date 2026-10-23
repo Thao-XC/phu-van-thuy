@@ -5,7 +5,8 @@ import { TempleScene, type TimeOfDay } from './three/TempleScene';
 import type { SpotDef } from './three/world/types';
 import type { StoryCard } from './three/encounters/types';
 import { Landing } from './components/Landing';
-import { Dock, type RitualKey } from './components/Dock';
+import type { RitualKey } from './components/Dock';
+import { PlacesPicker } from './components/Places';
 import { KeeperSheet } from './components/Keeper';
 import { JournalSheet } from './components/Journal';
 import { Tracker } from './components/Trail';
@@ -22,7 +23,6 @@ import { PossessionVeil, createPossessBus } from './components/PossessionVeil';
 import { daySchedule, hauDongState, fmtHour, hourOf } from './services/templeDay';
 import { KhanArt } from './components/LocArt';
 import { LuckChip, LuckToasts, CaptionBar, StoryCardSheet, LuckSheet } from './components/LuckAndLegends';
-import { VirtualJoystick } from './components/VirtualJoystick';
 import { soundService } from './services/soundService';
 import { luckService } from './services/luckService';
 import { storyService, useStory } from './services/storyService';
@@ -30,7 +30,7 @@ import { useBackLayer } from './services/backStack';
 import { PALACES, type PalaceId } from './data/story';
 import { XAM_TIER, type LocKind, type Xam } from './data/rituals';
 
-type Modal = 'keeper' | 'incense' | 'altar' | 'fortune' | 'furnace' | 'stall' | 'journal' | 'settings' | 'controls' | 'lantern' | 'film' | 'calendar' | 'haudong' | null;
+type Modal = 'keeper' | 'incense' | 'altar' | 'fortune' | 'furnace' | 'stall' | 'journal' | 'settings' | 'controls' | 'lantern' | 'film' | 'calendar' | 'haudong' | 'places' | null;
 
 const PROMPT: Record<string, string> = {
   gate: 'Vái before the gate',
@@ -434,6 +434,26 @@ export default function App() {
       else if (e.key === '1' && !modal) changeTime('day');
       else if (e.key === '2' && !modal) changeTime('twilight');
       else if (e.key === '3' && !modal) changeTime('night');
+      else if (e.key === '4' && !modal) {
+        // follow the real clock again
+        setAuto(false);
+        if (scene.current) scene.current.isAutoCycleTime = false;
+        setLive(true);
+      } else if (e.key === '5' && !modal) {
+        const a = !auto;
+        setLive(false);
+        setAuto(a);
+        if (scene.current) scene.current.isAutoCycleTime = a;
+        showCaption(a ? 'Time flows: day into dusk into night.' : 'Time holds still.', 2.5);
+      } else if ((e.key === 'c' || e.key === 'C') && !modal && !inRealm) {
+        const t = !tour;
+        setTour(t);
+        if (scene.current) scene.current.isCinematicMode = t;
+      } else if (e.key === 'Tab' && !modal && !card && !inRealm && !arriving) {
+        e.preventDefault();
+        scene.current?.releasePointer();
+        setModal('places');
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -727,19 +747,13 @@ export default function App() {
             <div className="text-xs uppercase tracking-[0.18em] text-[#8e1b1b] font-semibold text-center">Chào mừng</div>
             <h2 className="mt-1 text-xl font-display font-bold text-center">How to explore</h2>
             <ul className="mt-4 space-y-2.5 text-[14px]">
-              {isPc ? (
+              {(
                 <>
                   <li className="flex gap-3"><span className="w-16 shrink-0 font-semibold text-[#8e1b1b]">↑ ↓ ← →</span>Walk and turn (or WASD). Hold Shift to hurry.</li>
                   <li className="flex gap-3"><span className="w-16 shrink-0 font-semibold text-[#8e1b1b]">Mouse</span>Click the view, then move to look around. Esc frees the mouse.</li>
                   <li className="flex gap-3"><span className="w-16 shrink-0 font-semibold text-[#8e1b1b]">Space</span>Use what's in front of you, with your own hands. Click a golden marker to go there.</li>
                   <li className="flex gap-3"><span className="w-16 shrink-0 font-semibold text-[#8e1b1b]">B · P · F</span>Vái (bow) · pray · fortune sticks.</li>
-                  <li className="flex gap-3"><span className="w-16 shrink-0 font-semibold text-[#8e1b1b]">H · J · L</span>Menu bar · journal · the legend film. <span className="text-[#6d5b49]">? shows every key.</span></li>
-                </>
-              ) : (
-                <>
-                  <li className="flex gap-3"><span className="w-16 shrink-0 font-semibold text-[#8e1b1b]">Left</span>Drag the joystick to walk.</li>
-                  <li className="flex gap-3"><span className="w-16 shrink-0 font-semibold text-[#8e1b1b]">Right</span>Drag anywhere to look around.</li>
-                  <li className="flex gap-3"><span className="w-16 shrink-0 font-semibold text-[#8e1b1b]">Tap</span>The red button that appears near places to use them.</li>
+                  <li className="flex gap-3"><span className="w-16 shrink-0 font-semibold text-[#8e1b1b]">Tab · J · L</span>Go to a place · journal · the legend film. <span className="text-[#6d5b49]">? shows every key.</span></li>
                 </>
               )}
               <li className="flex gap-3"><span className="w-16 shrink-0 font-semibold text-[#8e1b1b]">✦</span>Secrets wake one at a time. Follow the riddle in the top-left card; a golden shimmer shows when you're close.</li>
@@ -771,58 +785,30 @@ export default function App() {
           Click: go to {spots.find((x) => x.id === aim)?.vi}
         </div>
       )}
-      {isPc && !inRealm && !modal && (
+      {!inRealm && !modal && !rite && !possessing && (
         <div className="hidden lg:flex fixed left-3 bottom-4 z-20 flex-col gap-1 px-3 py-2 rounded-xl bg-[#2a1410]/70 text-[#fbeed2] text-[12px] backdrop-blur-sm pointer-events-none">
           <span>{locked ? 'Mouse captured · Esc to release' : 'Click the view to look around'}</span>
-          <span className="opacity-80">↑↓←→ move · Space use · B vái · P pray · F xăm · H menu · ? keys</span>
+          <span className="opacity-80">↑↓←→ move · Space use · B vái · P pray · F xăm · Tab places · ? keys</span>
         </div>
       )}
 
-      {!inRealm && !arriving && modal !== 'haudong' && !rite && !possessing && (
-        <Dock
-          spots={spots}
-          time={time}
-          onTime={changeTime}
-          auto={auto}
-          live={live}
-          onLive={() => {
-            setAuto(false);
-            if (scene.current) scene.current.isAutoCycleTime = false;
-            setLive(true);
-          }}
-          onAuto={() => {
-            const a = !auto;
-            setLive(false);
-            setAuto(a);
-            if (scene.current) scene.current.isAutoCycleTime = a;
-          }}
-          tour={tour}
-          onTour={() => {
-            const t = !tour;
-            setTour(t);
-            if (scene.current) scene.current.isCinematicMode = t;
-          }}
-          onTeleport={(id) => scene.current?.travelToSpot(id)}
-          onRitual={openRitual}
-          onBow={() => scene.current?.bow()}
-        >
-          {near && !modal && PROMPT[near.type] && (
-            <button
-              onClick={() => openRitual(near.type)}
-              className="flex items-center gap-2 pl-1.5 pr-3 py-1 rounded-full bg-[#140b08]/60 backdrop-blur-sm text-[#fbeed2] text-[13px] cursor-pointer hover:bg-[#140b08]/75 transition-colors"
-            >
-              <kbd className="pointer-coarse:hidden px-1.5 py-0.5 rounded bg-[#b8382b] text-[11px] font-bold text-[#f3ead6]">Space</kbd>
-              {PROMPT[near.type]}
-            </button>
-          )}
-        </Dock>
+      {/* what Space does here: a quiet hint, not a button */}
+      {!inRealm && !arriving && !rite && !possessing && near && !modal && PROMPT[near.type] && (
+        <div className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 pl-1.5 pr-3 py-1 rounded-full bg-[#140b08]/60 backdrop-blur-sm text-[#fbeed2] text-[13px] pointer-events-none">
+          <kbd className="px-1.5 py-0.5 rounded bg-[#b8382b] text-[11px] font-bold text-[#f3ead6]">Space</kbd>
+          {PROMPT[near.type]}
+        </div>
       )}
-
-      <VirtualJoystick
-        onMove={(v) => {
-          if (scene.current) scene.current.joystickVector = v;
-        }}
-      />
+      {modal === 'places' && (
+        <PlacesPicker
+          spots={spots}
+          onClose={() => setModal(null)}
+          onGo={(id) => {
+            setModal(null);
+            scene.current?.travelToSpot(id);
+          }}
+        />
+      )}
 
       {/* sheets */}
       <ErrorBoundary key={modal ?? (card ? 'card' : 'none')} onReset={() => {

@@ -100,8 +100,12 @@ const KEYS: [string, string][] = [
   ['T', 'Secret trail'],
   ['L', 'Legend film of the Mothers'],
   ['M', 'Minimap on/off'],
-  ['H', 'Show or hide the menu bar'],
+  ['Tab', 'Go to a place (then 1–9)'],
+  ['G', 'The firefly guides you to the next secret'],
   ['1 / 2 / 3', 'Day, dusk, night'],
+  ['4', 'Back to real time (day and night follow your clock)'],
+  ['5', 'Let time flow on its own'],
+  ['C', 'Cinematic tour on/off'],
   ['Esc', 'Release the mouse, then step back one level'],
   ['?', 'This list'],
 ];
