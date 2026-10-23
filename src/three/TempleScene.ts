@@ -12,6 +12,8 @@ import type { EncounterDef, EncounterEvent, EncounterRuntime, StoryCard, Encount
 import { Firefly, Visitors, Arrival, Ceremony, type GiaLook } from './living';
 import { Possession, type PossessEvent } from './possession';
 import { PuppetShow, type PuppetEvent } from './puppets';
+import { WeatherFx, SKY_LOOK } from './weatherFx';
+import type { Season, Sky } from '../services/weather';
 import { HallAtmosphere } from './atmosphere';
 import { Hands, Rite, BowRite, IncenseRite, XamRite, type RiteHost } from './fpv';
 import { WORLD } from './world/phuVanThuy';
@@ -529,6 +531,46 @@ export class TempleScene {
       // only a few lanterns still burn outside
       this.dynamicLights.forEach((l) => (l.intensity = 0.9));
     }
+    this.applyWeatherLook();
+  }
+
+  /* ---------------- weather and seasons (synced with the real sky) ---------------- */
+  private _weather: WeatherFx | null = null;
+  private get weather() {
+    return (this._weather ??= new WeatherFx(this.scene));
+  }
+  private hemiBase = 0;
+  /** set the sky over the temple and the season in its trees */
+  public setWeather(sky: Sky, wind: number, season: Season) {
+    const seasonChanged = season !== this.weather.season || !this.petalParticles;
+    this.weather.set(sky, wind, season);
+    if (seasonChanged && !this.enc) {
+      // what drifts through the air: peach petals in spring, gold leaves in autumn
+      if (this.petalParticles) {
+        this.scene.remove(this.petalParticles);
+        this.petalParticles = null;
+      }
+      this.particleKind = season === 'xuan' ? 'petals' : season === 'thu' ? 'leaves' : season === 'ha' ? 'none' : 'none';
+      this.createParticles(this.particleKind);
+    }
+    soundService.setRain(sky === 'storm' ? 1 : sky === 'rain' ? 0.75 : sky === 'drizzle' ? 0.3 : 0);
+    this.setTimeOfDay(this.timeOfDay);
+  }
+  private applyWeatherLook() {
+    if (this.enc) return;
+    const L = SKY_LOOK[this.weather.sky];
+    const grey = new THREE.Color(this.timeOfDay === 'night' ? 0x0a0c10 : this.timeOfDay === 'twilight' ? 0x8a8288 : 0xa9b3b8);
+    const fog = this.scene.fog as THREE.FogExp2;
+    fog.color.lerp(grey, L.grey);
+    fog.density *= L.fog * (this.weather.season === 'dong' ? 1.3 : 1);
+    if (this.scene.background instanceof THREE.Color) this.scene.background.lerp(grey, L.grey);
+    this.sunLight.intensity *= L.sun;
+    if (this.timeOfDay === 'day') this.sunLight.color.set(this.weather.light);
+    this.hemiLight.intensity *= 0.75 + 0.25 * L.sun;
+    this.hemiBase = this.hemiLight.intensity;
+  }
+  public get weatherSky() {
+    return this.weather.sky;
   }
 
   /**
@@ -891,6 +933,12 @@ export class TempleScene {
     this.sunLight.target.position.copy(this.playerPosition);
     this.sunLight.position.copy(this.playerPosition).add(this.sunOffset);
     this.updateLightingCycle(delta);
+    // rain stops under the hall roof and in the hidden worlds
+    const sheltered = !!this.enc || this.ground(this.playerPosition.x, this.playerPosition.z) > 0.9;
+    if (this.weather.update(delta, this.camera.position, sheltered)) {
+      window.setTimeout(() => soundService.playThunder(), 400 + Math.random() * 1600);
+    }
+    if (this.hemiBase) this.hemiLight.intensity = this.hemiBase + this.weather.flash * 2.2;
     this.checkNearbySpots();
     this.updateAim(delta);
 
@@ -2146,6 +2194,7 @@ export class TempleScene {
    * Cleanup
    */
   public dispose() {
+    soundService.setRain(0);
     this.setCeremony(false);
     soundService.stopScape();
     this.isRunning = false;

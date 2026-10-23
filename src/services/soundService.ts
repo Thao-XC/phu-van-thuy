@@ -26,6 +26,7 @@ class SoundService {
 
   public setMuted(muted: boolean) {
     this.isMuted = muted;
+    if (this.rainNode && this.ctx) this.rainNode.gain.gain.setTargetAtTime(muted ? 0 : this.rainLevel * 0.22, this.ctx.currentTime, 0.2);
     if (this.ambientGain) {
       this.ambientGain.gain.setValueAtTime(muted ? 0 : 0.15, this.ctx?.currentTime || 0);
     }
@@ -110,6 +111,40 @@ class SoundService {
   public playSplash() {
     this.noise(0.9, 1200, 0.6, 0.45, 0.01, 'bandpass');
     this.noise(1.6, 400, 0.6, 0.25, 0.05);
+  }
+
+  /* ---------------- rain on the roof tiles ---------------- */
+  private rainNode: { src: AudioBufferSourceNode; gain: GainNode } | null = null;
+  /** 0 = dry, 0.3 drizzle, 0.75 rain, 1 storm */
+  private rainLevel = 0;
+  public setRain(level: number) {
+    this.rainLevel = level;
+    const ctx = this.initContext();
+    if (!ctx) return;
+    if (!this.rainNode && level > 0) {
+      const buf = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      let last = 0;
+      for (let i = 0; i < d.length; i++) {
+        // pink-ish hiss, with the odd heavier drop
+        last = 0.97 * last + 0.03 * (Math.random() * 2 - 1);
+        d[i] = last * 6 + (Math.random() < 0.0006 ? (Math.random() - 0.5) * 0.8 : 0);
+      }
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 2600;
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      src.connect(lp);
+      lp.connect(gain);
+      gain.connect(ctx.destination);
+      src.start();
+      this.rainNode = { src, gain };
+    }
+    if (this.rainNode) this.rainNode.gain.gain.setTargetAtTime(this.isMuted ? 0 : level * 0.22, ctx.currentTime, 1.2);
   }
 
   /** a paddle dipping and pulling through the water */

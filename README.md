@@ -59,6 +59,13 @@ autumn seasons, and all day on great festivals; see the calendar). Kneel on the 
 five spirits in turn, each with their own costume, props, dance and coloured aura; keep the beat with the phách to make
 the aura bloom, or just watch.
 
+**Weather and seasons.** The temple's sky follows the real one over Phủ Dầy (Nam Định), the home of Mẫu Liễu Hạnh,
+read live from Open-Meteo (free, no key) every 20 minutes: clear, cloudy, fog, mưa phùn drizzle, rain and
+thunderstorms with lightning, with rain on the tiles you can hear (it stops under the hall roof). The four northern
+seasons change the light, the greens of the trees and what drifts in the air: spring peach petals, summer heat,
+autumn's gold leaves, winter's cold grey mist. The clock shows the weather and temperature. Preview with
+`?weather=rain|storm|drizzle|fog|cloudy|clear` and `?season=xuan|ha|thu|dong`.
+
 **Múa rối nước.** Press Space at the Thủy đình on the lotus pond to sit on the bank and watch a two-minute
 water-puppet show: Chú Tễu opens it and chats in a speech bubble, dragons rear up and spray water, four fairies dance,
 a buffalo ploughs and rice seedlings rise row by row, a fisherman lands a leaping fish, and everyone bows. Space claps

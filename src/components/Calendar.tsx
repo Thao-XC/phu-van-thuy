@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Sun, Sunset, Moon } from 'lucide-react';
+import { Sun, Sunset, Moon, Cloud, CloudFog, CloudDrizzle, CloudRain, CloudLightning } from 'lucide-react';
+import { SEASONS, SKIES, TEMPLE_PLACE, type Weather } from '../services/weather';
 import { Sheet } from './ui/Sheet';
 import { fmtHour, hourOf, type Session } from '../services/templeDay';
 import { toLunar, yearName, yearAnimal, festivalOn, nextFestival, today, FESTIVALS, type Festival, type LunarDate } from '../services/lunar';
@@ -64,20 +65,22 @@ export const CalendarChip: React.FC<{ onClick: () => void; now: Date; lunar: Lun
  * The temple clock, top right: the real time with a sun, dusk or moon for how the temple looks,
  * and today's date in both calendars. Click (or the calendar key) for the festival sheet.
  */
-export const TempleClock: React.FC<{ onClick: () => void; lunar: LunarDate; festival: Festival | null; tod: 'day' | 'twilight' | 'night'; live: boolean }> = ({ onClick, lunar, festival, tod, live }) => {
+export const TempleClock: React.FC<{ onClick: () => void; lunar: LunarDate; festival: Festival | null; tod: 'day' | 'twilight' | 'night'; live: boolean; weather?: Weather | null }> = ({ onClick, lunar, festival, tod, live, weather }) => {
   const [t, setT] = useState(() => today());
   useEffect(() => {
     const i = window.setInterval(() => setT(today()), 5000);
     return () => clearInterval(i);
   }, []);
   const Icon = tod === 'day' ? Sun : tod === 'twilight' ? Sunset : Moon;
+  const W = weather ? { clear: null, cloudy: Cloud, fog: CloudFog, drizzle: CloudDrizzle, rain: CloudRain, storm: CloudLightning }[weather.sky] : null;
+  const wx = weather ? `${SEASONS[weather.season].vi} · ${SKIES[weather.sky].vi}${weather.tempC != null ? ` ${Math.round(weather.tempC)}°C` : ''} · ${weather.live ? `live at ${TEMPLE_PLACE.name}` : "the season's usual weather"}` : '';
   const hh = String(t.getHours()).padStart(2, '0');
   const mm = String(t.getMinutes()).padStart(2, '0');
   return (
     <button
       onClick={onClick}
       className={`flex items-center gap-2 pl-2 pr-3 py-1 rounded-md cursor-pointer ${festival?.major ? 'dh-seal' : 'dh-paper'}`}
-      title={`${t.toDateString()} · ${lunarLabel(lunar)} ÂL${festival ? ` · ${festival.vi}` : ''}${live ? '' : ' · time held (press 4 for real time)'}`}
+      title={`${t.toDateString()} · ${lunarLabel(lunar)} ÂL${festival ? ` · ${festival.vi}` : ''}${wx ? `\n${wx}` : ''}${live ? '' : '\ntime held (press 4 for real time)'}`}
       aria-label={`${hh}:${mm}, ${t.toDateString()}, lunar ${lunarLabel(lunar)}`}
     >
       <span className={`relative flex items-center justify-center w-7 h-7 rounded-full ${tod === 'night' ? 'bg-[#1c2340] text-[#f3e3a6]' : tod === 'twilight' ? 'bg-[#e8915a] text-[#fff4dc]' : 'bg-[#f2c14e] text-[#8e1b1b]'}`}>
@@ -94,6 +97,12 @@ export const TempleClock: React.FC<{ onClick: () => void; lunar: LunarDate; fest
           {t.getDate()}/{t.getMonth() + 1} · {lunar.day}/{lunar.month} ÂL
         </span>
       </span>
+      {weather && (
+        <span className="flex flex-col items-center leading-none pl-2 ml-0.5 border-l border-current/20">
+          {W ? <W className="w-4 h-4" /> : <Sun className="w-4 h-4 opacity-70" />}
+          {weather.tempC != null && <span className="mt-0.5 text-[10px] font-bold tabular-nums">{Math.round(weather.tempC)}°</span>}
+        </span>
+      )}
     </button>
   );
 };

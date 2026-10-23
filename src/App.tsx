@@ -7,6 +7,7 @@ import type { StoryCard } from './three/encounters/types';
 import { Landing } from './components/Landing';
 import type { RitualKey } from './components/Dock';
 import { PlacesPicker } from './components/Places';
+import { useWeather, weatherLine } from './services/weather';
 import { PuppetSight, createPuppetBus } from './components/PuppetSight';
 import { KeeperTalk } from './components/Keeper';
 import { JournalSheet } from './components/Journal';
@@ -70,6 +71,8 @@ export default function App() {
     }
   });
   const cal = useCalendar();
+  // the real sky over the Red River delta, and the season
+  const weather = useWeather();
   const [festBanner, setFestBanner] = useState(false);
   // the temple's day: bells, offerings and hầu đồng sessions on the visitor's clock
   const sched = useMemo(() => daySchedule(cal.lunar.month, cal.lunar.day, cal.festival), [cal.lunar.month, cal.lunar.day, cal.festival]);
@@ -442,6 +445,19 @@ export default function App() {
     const t = window.setTimeout(() => setKeysHint(false), 20000);
     return () => clearTimeout(t);
   }, [view, loading, arriving]);
+  // the real weather and season over the temple
+  useEffect(() => {
+    if (view !== 'temple' || loading || !weather || inRealm) return;
+    scene.current?.setWeather(weather.sky, weather.wind, weather.season);
+  }, [view, loading, weather, inRealm]);
+  // and a line about it, once, a little after you arrive
+  const toldWeather = useRef(false);
+  useEffect(() => {
+    if (view !== 'temple' || loading || arriving || !weather || toldWeather.current) return;
+    toldWeather.current = true;
+    const t = window.setTimeout(() => showCaption(weatherLine(weather), 5), 6500);
+    return () => clearTimeout(t);
+  }, [view, loading, arriving, weather, showCaption]);
   // keyboard: E to interact. No dependency list on purpose: the handler reads a lot of current
   // state (near, modal, rite…), so it is re-attached after every render rather than going stale.
   useEffect(() => {
@@ -674,7 +690,7 @@ export default function App() {
 
       {/* top-right: phúc, scarves, journal, sound */}
       <div className={`fixed top-[max(0.75rem,env(safe-area-inset-top))] right-3 z-30 flex items-center gap-1.5 sm:gap-2 ${modal === 'haudong' || modal === 'puppets' || possessing ? 'hidden' : ''}`}>
-        <TempleClock lunar={cal.lunar} festival={cal.festival} tod={time} live={live} onClick={() => setModal('calendar')} />
+        <TempleClock lunar={cal.lunar} festival={cal.festival} tod={time} live={live} weather={weather} onClick={() => setModal('calendar')} />
         <LuckChip onClick={() => setShowPhuc(true)} compact />
         <button onClick={() => openJournal()} className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-xl dh-paper border border-[#211a15] shadow-md cursor-pointer hover:border-[#8e1b1b]" aria-label={`Journal: ${story.khan.length} of 4 scarves`}>
           <span className="flex -space-x-2.5">
