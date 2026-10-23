@@ -819,9 +819,9 @@ export default function App() {
         </div>
       )}
       {!inRealm && !modal && !rite && !possessing && !arriving && !loading && !keysHint && (
-        <div className="fixed left-3 bottom-4 z-20 w-6 h-6 flex items-center justify-center rounded-full bg-[#2a1410]/45 text-[#fbeed2]/80 text-[12px] font-bold pointer-events-none" title="? shows every key">
+        <button onClick={() => setModal('controls')} className="fixed left-3 bottom-4 z-20 w-6 h-6 flex items-center justify-center rounded-full bg-[#2a1410]/45 hover:bg-[#2a1410]/75 text-[#fbeed2]/80 text-[12px] font-bold cursor-pointer" title="Every key (?)" aria-label="Controls">
           ?
-        </div>
+        </button>
       )}
 
       {/* what Space does here: a quiet hint, not a button */}

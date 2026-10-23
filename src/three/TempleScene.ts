@@ -602,7 +602,7 @@ export class TempleScene {
       if (e.code === 'Space' && !e.repeat) {
         e.preventDefault();
         this.puppets.clap();
-      }
+      } else if (e.code === 'KeyS' && !e.repeat) this.puppets.skip();
       return;
     }
     if (this.possession) {

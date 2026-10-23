@@ -101,7 +101,7 @@ export const PuppetSight: React.FC<{ bus: PuppetBus; anchor: () => { x: number; 
       )}
 
       <div className="absolute bottom-[2.6vh] left-1/2 -translate-x-1/2 text-[12px] text-[#f1dfc0]/70">
-        <kbd className="px-1 rounded border border-current">Space</kbd> vỗ tay · clap &nbsp;·&nbsp; <kbd className="px-1 rounded border border-current">Esc</kbd> leave
+        <kbd className="px-1 rounded border border-current">Space</kbd> vỗ tay · clap &nbsp;·&nbsp; <kbd className="px-1 rounded border border-current">S</kbd> next act &nbsp;·&nbsp; <kbd className="px-1 rounded border border-current">Esc</kbd> leave
       </div>
     </div>
   );

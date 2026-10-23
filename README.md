@@ -1,7 +1,7 @@
 # Phủ Vân Thủy
 
 A 3D, first-person visit to a fictional Vietnamese Mother Goddess temple (Đạo Mẫu, the Four Palaces).
-Works on phone and PC.
+Made for PC browsers: keyboard and mouse.
 
 **Story.** Tonight the temple should hold a *hầu đồng* ceremony, but the four sacred scarves have vanished
 into the Four Palaces. Talk to Bà Thủ Từ, the temple keeper, then find your way into each realm:
@@ -98,7 +98,7 @@ Phủ Vân Thủy is fictional, made with respect for Đạo Mẫu, whose ritual
 2. On itch.io: **Create new project** → Kind of project: **HTML** → upload `phu-van-thuy-itch.zip` →
    tick **This file will be played in the browser**.
 3. Embed options: viewport **1280 × 720**, tick **Fullscreen button** and **Click to launch in fullscreen**
-   (recommended for mouse-look), and **Mobile friendly** if you want phones too.
+   (recommended for mouse-look). Leave **Mobile friendly** off: the game is played with a keyboard.
 4. The temple keeper's AI replies need the Vercel API. To use it from itch, build with
    `VITE_KEEPER_URL=https://<your-vercel-app>/api/keeper npm run build:itch`; without it she answers from her
    built-in knowledge. Progress is saved in the player's browser (itch's game domain).

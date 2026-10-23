@@ -104,7 +104,7 @@ const KEYS: [string, string][] = [
   ['T', 'Secret trail'],
   ['L', 'Legend film of the Mothers'],
   ['M', 'Minimap on/off'],
-  ['Tab', 'Go to a place (then 1–9)'],
+  ['Tab', 'Go to a place (a number, or ↑ ↓ and Enter)'],
   ['G', 'The firefly guides you to the next secret'],
   ['1 / 2 / 3', 'Day, dusk, night'],
   ['4', 'Back to real time (day and night follow your clock)'],

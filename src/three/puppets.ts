@@ -320,6 +320,15 @@ export class PuppetShow {
       this.drops.push({ p: new THREE.Vector3(x, y, z), v, t: 0 });
     }
   }
+  /** S: on to the next act (or the bow) */
+  skip() {
+    const next = ACTS.find((a) => a.at > this.t + 0.5);
+    const to = next ? next.at : SHOW_LEN;
+    LINES.forEach((l, i) => {
+      if (l.at < to) this.said.add(i);
+    });
+    this.t = to;
+  }
   /** Space: the audience claps, and Tễu (if he's out) waves back */
   clap() {
     soundService.playClap(3);
