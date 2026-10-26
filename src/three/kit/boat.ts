@@ -233,7 +233,8 @@ export function makeBoat(): BoatParts {
   const glow = new THREE.PointLight(0xffa860, 1.4, 9, 2);
   lamp.add(glow);
   add(lamp, 3.05, sheer(3.0) + 0.38, 0.86);
-  const tray = add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.17, 0.05, 18), new THREE.MeshStandardMaterial({ color: 0xc8302a, roughness: 0.4 })), 1.75, -0.02, 0.18);
+  const tray = add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.17, 0.05, 18), new THREE.MeshStandardMaterial({ color: 0xc8302a, roughness: 0.4 })), 2.3, 0.355, 0);
+  // (on the front thwart, never on the floorboards: offerings don't go on the floor)
   [0xe2b23a, 0xf08a2a, 0x8db27a].forEach((c, i) => {
     const fruit = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), new THREE.MeshStandardMaterial({ color: c, roughness: 0.5 }));
     fruit.position.set(Math.cos(i * 2.1) * 0.08, 0.06, Math.sin(i * 2.1) * 0.08);

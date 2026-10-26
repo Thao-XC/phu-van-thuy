@@ -457,9 +457,26 @@ export class Ceremony {
     rug.rotation.x = -Math.PI / 2;
     rug.position.set(0, y + 0.02, -10.8);
     this.g.add(rug);
-    const tray = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.3, 0.12, 14), mat(0xd6a12b, { metalness: 0.4 }));
-    tray.position.set(0, y + 0.06, -12.1);
-    this.g.add(tray);
+    // the offerings sit on a low red-lacquered table (kỷ), never on the mat itself
+    const table = new THREE.Group();
+    const top = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.06, 0.6), mat(0x8f1f17, { roughness: 0.4 }));
+    top.position.y = 0.42;
+    table.add(top);
+    [-1, 1].forEach((sx) => [-1, 1].forEach((sz) => {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.4, 0.07), mat(0x5a1410));
+      leg.position.set(sx * 0.48, 0.2, sz * 0.24);
+      table.add(leg);
+    }));
+    const tray = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.26, 0.08, 18), mat(0xd6a12b, { metalness: 0.45, roughness: 0.35 }));
+    tray.position.y = 0.49;
+    table.add(tray);
+    [0xe2b23a, 0xf08a2a, 0xc81e1e, 0x8db27a, 0xf2e6c8].forEach((c, i) => {
+      const f = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), mat(c, { roughness: 0.5 }));
+      f.position.set(Math.cos(i * 1.26) * 0.14, 0.58, Math.sin(i * 1.26) * 0.14);
+      table.add(f);
+    });
+    table.position.set(0, y, -12.4);
+    this.g.add(table);
 
     // the medium: in ritual robes with wide sleeves, the red khăn phủ diện over the head
     const med = person({ sex: 'f', outfit: 'robe', robe: 0xc81e1e, under: 0xe8b830, trousers: 0xf1ece0, hair: 'bun', wideSleeves: true, h: 1.6 });
@@ -729,5 +746,163 @@ export class Ceremony {
   }
   dispose(scene: THREE.Scene) {
     scene.remove(this.g);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* the people who belong to the temple: always busy with something      */
+/* ------------------------------------------------------------------ */
+type Busy = { fig: Person; at: THREE.Vector3; update: (t: number, dt: number) => void; when: 'day' | 'always' };
+
+/**
+ * Residents and regulars, each doing what people do at a temple: an old man sweeping the
+ * courtyard, two elders over tea by the keeper, a devotee bowing with incense at the great
+ * burner, someone feeding paper offerings to the furnace, the amulet-stall seller, two women
+ * kneeling in prayer in the hall, and children chasing each other near the gate.
+ */
+export class Residents {
+  private list: Busy[] = [];
+  private g = new THREE.Group();
+
+  constructor(scene: THREE.Scene, private ground: Ground, floorY: number) {
+    const gy = (x: number, z: number) => this.ground(x, z);
+    const add = (fig: Person, x: number, z: number, face: number, when: Busy['when'], update: Busy['update']) => {
+      fig.position.set(x, gy(x, z), z);
+      fig.rotation.y = face;
+      this.g.add(fig);
+      this.list.push({ fig, at: new THREE.Vector3(x, 0, z), update, when });
+    };
+    const wood = new THREE.MeshStandardMaterial({ color: 0x5b3b22, roughness: 0.7 });
+
+    // 1. the sweeper: a chổi rơm broom, long slow strokes back and forth across the brick
+    const sweeper = person({ sex: 'm', elder: true, outfit: 'aonau', robe: 0x6b5a44, trousers: 0x2a2620, hair: 'khanxep', h: 1.6 });
+    const broom = new THREE.Group();
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 1.3, 6), wood);
+    handle.position.y = -0.55;
+    const head = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.38, 10), new THREE.MeshStandardMaterial({ color: 0xc8a75a, roughness: 0.95 }));
+    head.position.y = -1.25;
+    broom.add(handle, head);
+    broom.rotation.x = 0.5;
+    sweeper.userData.j.arms[1].hand.add(broom);
+    add(sweeper, 10, 24, Math.PI / 2, 'day', (t) => {
+      const j = sweeper.userData.j;
+      const u = (Math.sin(t * 0.12) + 1) / 2; // drifting slowly along a row of bricks
+      sweeper.position.x = 8 + u * 6;
+      sweeper.position.z = 24 + Math.sin(t * 0.05) * 3;
+      sweeper.rotation.y = Math.cos(t * 0.12) > 0 ? Math.PI / 2 : -Math.PI / 2;
+      j.torso.rotation.x = 0.35;
+      j.arms.forEach((a, i) => {
+        a.sh.rotation.set(-0.7 + Math.sin(t * 2.2) * 0.35, 0, (i ? -1 : 1) * 0.25);
+        a.el.rotation.set(-0.5, 0, 0);
+      });
+      j.legs.forEach((l) => (l.hip.rotation.x = l.knee.rotation.x = 0));
+    });
+
+    // 2. tea by the keeper: a low table, a pot, two elders kneeling and talking
+    const table = new THREE.Group();
+    const top = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.05, 0.6), new THREE.MeshStandardMaterial({ color: 0x6a3a20, roughness: 0.5 }));
+    top.position.y = 0.32;
+    table.add(top);
+    [-1, 1].forEach((sx) => [-1, 1].forEach((sz) => {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.3, 0.05), wood);
+      leg.position.set(sx * 0.4, 0.15, sz * 0.25);
+      table.add(leg);
+    }));
+    const porcelain = new THREE.MeshStandardMaterial({ color: 0xeef2f0, roughness: 0.3 });
+    const pot = new THREE.Mesh(new THREE.SphereGeometry(0.08, 14, 10), porcelain);
+    pot.position.set(0, 0.42, 0);
+    table.add(pot);
+    [-0.2, 0.2].forEach((x) => {
+      const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.022, 0.04, 10), porcelain);
+      cup.position.set(x, 0.37, 0.12);
+      table.add(cup);
+    });
+    table.position.set(6.8, gy(6.8, 19.6), 19.6);
+    this.g.add(table);
+    [[6.1, 19.6, Math.PI / 2], [7.5, 19.6, -Math.PI / 2]].forEach(([x, z, face], i) => {
+      const elder = person({ sex: i ? 'f' : 'm', elder: true, outfit: i ? 'aonau' : 'aothe', robe: i ? 0x5b3a2a : 0x1f2a3e, hair: i ? 'khanvan' : 'khanxep', pose: 'kneel', h: 1.58 });
+      add(elder, x, z, face, 'day', (t) => {
+        const j = elder.userData.j;
+        // one talks with a hand, the other lifts a cup now and then
+        const sip = Math.max(0, Math.sin(t * 0.4 + i * 2)) > 0.92;
+        j.arms[1].sh.rotation.set(sip ? -1.3 : -0.5 + Math.sin(t * (i ? 1.1 : 1.7)) * 0.15, 0, -0.2);
+        j.arms[1].el.rotation.set(sip ? -1.6 : -0.9, 0, 0);
+        j.arms[0].sh.rotation.set(-0.4, 0, 0.2);
+        j.arms[0].el.rotation.set(-0.8, 0, 0);
+        j.head.rotation.y = Math.sin(t * 0.3 + i) * 0.25;
+        j.head.rotation.x = Math.sin(t * 1.3 + i) * 0.05;
+      });
+    });
+
+    // 3. a devotee with incense at the great burner: raise, bow, again
+    const devotee = person({ sex: 'f', outfit: 'aodai', robe: 0x9e2a1e, hair: 'bun', h: 1.55 });
+    const sticks = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.36, 5), new THREE.MeshStandardMaterial({ color: 0xb5332a }));
+    sticks.position.set(0, -0.08, 0.06);
+    devotee.userData.j.arms[1].hand.add(sticks);
+    add(devotee, 0.4, 15.9, Math.PI, 'always', (t) => {
+      const k = (Math.sin(t * 0.9) + 1) / 2;
+      pray(devotee, 1, k);
+    });
+
+    // 4. at the furnace: feeding gold paper to the fire
+    const burnerP = person({ sex: 'm', outfit: 'aothe', robe: 0x34507a, trousers: 0x2a2620, hair: 'short', h: 1.66 });
+    add(burnerP, 14.6, 11.7, Math.PI - 0.6, 'day', (t) => {
+      const j = burnerP.userData.j;
+      const feed = (Math.sin(t * 1.2) + 1) / 2;
+      j.torso.rotation.x = 0.15 + feed * 0.2;
+      j.arms.forEach((a, i) => {
+        a.sh.rotation.set(-0.6 - feed * 0.6, 0, (i ? -1 : 1) * 0.2);
+        a.el.rotation.set(-0.4, 0, 0);
+      });
+    });
+
+    // 5. the amulet seller behind her stall, arranging, calling softly
+    const seller = person({ sex: 'f', outfit: 'aonau', robe: 0x8a5a3b, under: 0x2a2420, hair: 'bun', hat: 'non', h: 1.52 });
+    add(seller, 10.35, 33.1, Math.PI - 0.4, 'day', (t) => {
+      const j = seller.userData.j;
+      j.arms.forEach((a, i) => {
+        a.sh.rotation.set(-0.7 + Math.sin(t * 1.4 + i) * 0.2, 0, (i ? -1 : 1) * 0.3);
+        a.el.rotation.set(-0.7, 0, 0);
+      });
+      j.head.rotation.y = Math.sin(t * 0.25) * 0.5;
+    });
+
+    // 6. two women kneeling before the altar, bowing slowly
+    [[-3.3, -6.9], [-1.7, -7.3]].forEach(([x, z], i) => {
+      const w = person({ sex: 'f', elder: i === 0, outfit: i ? 'aodai' : 'aonau', robe: i ? 0xf1ead8 : 0x5b3a2a, hair: i ? 'bun' : 'khanvan', pose: 'kneel', h: 1.55 });
+      w.position.y = floorY;
+      add(w, x, z, Math.PI, 'always', (t) => {
+        w.position.y = floorY;
+        pray(w, 1, Math.max(0, Math.sin(t * 0.55 + i * 1.7)) * 1.1);
+      });
+    });
+
+    // 7. children chasing each other round and round near the gate
+    [0, 1].forEach((i) => {
+      const kid = person({ sex: i ? 'm' : 'f', outfit: i ? 'aothe' : 'aonau', robe: i ? 0x2f7a5a : 0xc8302a, trousers: 0x2a2620, hair: i ? 'short' : 'bun', h: 1.12 });
+      let ph = i * 0.9;
+      add(kid, -7, 31, 0, 'day', (t, dt) => {
+        ph += dt * 1.4;
+        const cx = -7.5, cz = 30.5, r = 2.4;
+        kid.position.x = cx + Math.cos(ph) * r;
+        kid.position.z = cz + Math.sin(ph) * r;
+        kid.position.y = this.ground(kid.position.x, kid.position.z) + Math.abs(Math.sin(t * 9 + i)) * 0.05;
+        kid.rotation.y = -ph; // facing along the circle
+        walk(kid, t * 9 + i * 2, 1.3);
+      });
+    });
+
+    this.g.traverse((o) => ((o as THREE.Mesh).castShadow = true));
+    scene.add(this.g);
+  }
+
+  update(dt: number, t: number, player: THREE.Vector3, night: boolean, visible: boolean) {
+    this.g.visible = visible;
+    if (!visible) return;
+    for (const b of this.list) {
+      const on = (b.when === 'always' || !night) && Math.hypot(player.x - b.fig.position.x, player.z - b.fig.position.z) < 45;
+      b.fig.visible = on;
+      if (on) b.update(t, dt);
+    }
   }
 }

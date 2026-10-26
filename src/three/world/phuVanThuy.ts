@@ -45,6 +45,7 @@ export const phuVanThuy: Layout = (ctx) => {
 
   /* ---------------- ground ---------------- */
   const inPond = (x: number, z: number) => Math.hypot(x - POND.x, z - POND.z) < POND.r && z > POND.z - 0.5;
+  let dockWalk = false;
   ctx.setGround((x, z) => {
     // hall podium and its steps
     if (x > POD.x0 && x < POD.x1 && z > POD.z0 && z < POD.z1) return FLOOR_Y;
@@ -56,7 +57,8 @@ export const phuVanThuy: Layout = (ctx) => {
       return base + Math.max(0, -34 - x) * 1.2;
     }
     // the landing stage, out over the water
-    if (Math.abs(x) < 2.5 && z > 61.5 && z < 68) return 0.05;
+    // (only for walking: the terrain mesh is shaped before this switches on, so no grass pokes up through the boards)
+    if (dockWalk && Math.abs(x) < 2.5 && z > 61.5 && z < 68) return 0.05;
     // pond bed
     if (inPond(x, z)) return -1.2 * (1 - Math.hypot(x - POND.x, z - POND.z) / POND.r);
     // river bank
@@ -66,6 +68,7 @@ export const phuVanThuy: Layout = (ctx) => {
     return 0;
   });
   ctx.terrain(0x55703f, 420, 170);
+  dockWalk = true;
 
   /* ---------------- river, landing, path ---------------- */
   const river = ctx.water(-0.35, 420, 140, 0, 136, 0x2f6f6a);
@@ -347,7 +350,7 @@ export const phuVanThuy: Layout = (ctx) => {
     bounds: { x0: -31, x1: 31, z0: -24, z1: 67.6 },
     walkable: (x, z) => {
       if (walls(x, z)) return false;
-      if (z > 63.8 && Math.abs(x) > 2.3) return false; // the river either side of the landing stage
+      if (z > 62.6 && Math.abs(x) > 2.3) return false; // the river either side of the landing stage
       if (Math.hypot(x - BANYAN.x, z - BANYAN.z) < 2.3) return false;
       if (Math.hypot(x, z - 14) < 1.25) return false; // incense burner
       if (Math.abs(x - 14) < 1.6 && Math.abs(z - 10) < 1.6) return false; // furnace

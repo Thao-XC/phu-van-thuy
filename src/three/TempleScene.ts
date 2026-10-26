@@ -9,7 +9,7 @@ import { VietKit } from './kit/vietnam';
 import { phuVanThuy } from './world/phuVanThuy';
 import type { GroundFn, LayoutCtx, LayoutResult, ParticleKind, SecretDef, Etiquette, SpotDef } from './world/types';
 import type { EncounterDef, EncounterEvent, EncounterRuntime, StoryCard, EncounterApi } from './encounters/types';
-import { Firefly, Visitors, Arrival, Ceremony, type GiaLook } from './living';
+import { Firefly, Visitors, Arrival, Ceremony, Residents, type GiaLook } from './living';
 import { Possession, type PossessEvent } from './possession';
 import { PuppetShow, type PuppetEvent } from './puppets';
 import { WeatherFx, SKY_LOOK } from './weatherFx';
@@ -381,6 +381,9 @@ export class TempleScene {
     this.firefly.onArrive = () => this.callbacks.onGuideArrive?.();
     this.firefly.attach(this.scene, this.playerPosition.clone().add(new THREE.Vector3(-1, 0, -1)));
     this.visitors = new Visitors(this.scene, this.ground);
+    // a busier temple: every regular visitor comes every day, and the residents go about their work
+    this.visitors.setCrowd(true);
+    this.residents = new Residents(this.scene, this.ground, this.ground(0, -7));
     // the boat you came on waits at the landing, to take you home whenever you like
     this.arrival?.dispose();
     this.arrival = new Arrival(this.scene);
@@ -1678,6 +1681,7 @@ export class TempleScene {
   /* ---------------- the living temple ---------------- */
   private firefly: Firefly | null = null;
   private visitors: Visitors | null = null;
+  private residents: Residents | null = null;
   private arrival: Arrival | null = null;
   private arrivalLook = new THREE.Vector3();
   private departing: { t: number; from: THREE.Vector3; onGone: () => void; sat?: boolean; faded?: boolean } | null = null;
@@ -1728,7 +1732,7 @@ export class TempleScene {
       this.festival = buildFestivalDecor(kind, this.kitForEncounters.vk, this.ground);
       this.scene.add(this.festival.group);
     }
-    this.visitors?.setCrowd(crowd);
+    this.visitors?.setCrowd(true || crowd);
   }
   public releaseCarp() {
     this.festival?.releaseCarp?.();
@@ -1965,6 +1969,7 @@ export class TempleScene {
     const outside = !this.enc;
     this.firefly?.update(dt, t, this.playerPosition, this.playerRotationY, outside && !this.arriving && !this.isCinematicMode && !this.watching);
     this.visitors?.update(dt, t, this.playerPosition, outside);
+    this.residents?.update(dt, t, this.playerPosition, this.timeOfDay === 'night', outside);
     this.festival?.update(t, dt);
     if (this.ceremony) {
       this.ceremony.update(t, dt);

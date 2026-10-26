@@ -740,14 +740,21 @@ export class VietKit {
       fl.position.set(x, 2.2, 1.0);
       g.add(fl);
     });
-    // Five Tigers under the altar, in their five colours
+    // Five Tigers in their own small shrine under the altar (cung Ngũ Hổ): a raised red plinth
+    // inside a gilded frame, each tiger on its own little lotus-red cushion, never on the floor
+    g.add(box(6.0, 0.32, 0.8, L, 0, 0.16, 1.75));
+    g.add(box(6.1, 0.05, 0.85, G, 0, 0.34, 1.75));
+    g.add(box(6.3, 0.14, 0.9, G, 0, 1.05, 1.75));
+    [-3.08, 3.08].forEach((x) => g.add(box(0.14, 1.0, 0.9, G, x, 0.55, 1.75)));
+    g.add(box(6.0, 0.7, 0.05, std({ color: 0x2a0d08, roughness: 0.9 }), 0, 0.7, 1.33));
     [0xd4a017, 0xb81c1c, 0xf4f1ea, 0x2a2a2a, 0x2f8a4a].forEach((c, i) => {
+      g.add(box(0.7, 0.04, 0.5, std({ color: 0xc81e1e, roughness: 0.6 }), -2.2 + i * 1.1, 0.385, 1.75));
       const t = this.tiger(c);
-      t.position.set(-2.2 + i * 1.1, 0, 1.75);
+      t.position.set(-2.2 + i * 1.1, 0.4, 1.75);
+      t.scale.setScalar(0.85);
       t.rotation.y = -Math.PI / 2;
       g.add(t);
     });
-    g.add(box(6, 0.04, 0.4, std({ color: 0x1a0d08 }), 0, 0.02, 1.75));
     // altar glow
     const glow = new THREE.PointLight(0xffb45a, 14, 14, 1.6);
     glow.name = 'altarGlow';
